@@ -31,14 +31,6 @@ st.markdown("""
         font-size: 0.88em;
         line-height: 1.5;
     }
-    .warning-card {
-        background-color: #fff3cd;
-        padding: 10px;
-        border-radius: 6px;
-        border-left: 4px solid #ffc107;
-        margin-bottom: 12px;
-        font-size: 0.85em;
-    }
     table {
         width: 100% !important;
         border-collapse: collapse;
@@ -50,29 +42,28 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. 🛡️ 左側側邊欄：標準 PPT 格式與輸入指引
+# 2. 🛡️ 左側側邊欄：標準 PPT 與草稿模式指引
 # ==========================================
 with st.sidebar:
-    st.markdown("<div class='sidebar-title'>📖 PPT 格式與輸入指引</div>", unsafe_allow_html=True)
+    st.markdown("<div class='sidebar-title'>📖 使用方式與格式指引</div>", unsafe_allow_html=True)
     
     st.markdown("""
-    為了讓 AI 能 100% 精準擷取會議內容並生成完整紀錄，請確保上傳的 **PPT 頁面符合以下排版格式**：
+    本系統支援兩種會議內容輸入模式（二選一）：
     """)
     
     st.markdown("""
     <div class='guideline-card'>
-    <b>📌 PPT 標準結構排版：</b><br>
-    • <b>頂部：</b>主議題 (對應範本大標題，如「三、培訓」)<br>
-    • <b>中間：</b>子題目 (對應項目編號，如「3.1 培訓資助」)<br>
-    • <b>最下面：</b>詳細文字內容 (具體決議、名單或數據)
+    <b>📊 模式 A：上傳 PPT 簡報</b><br>
+    • <b>排版建議：</b>頁面頂部為大議題，中間為子題目，下方為詳細文字。<br>
+    • <b>顯示邏輯：</b>系統會自動將內容填入範本結構；若 PPT 頁面僅有子題目而無詳細文字，紀錄中將直接顯示該子題目。
     </div>
     """, unsafe_allow_html=True)
     
     st.markdown("""
-    <div class='warning-card'>
-    ⚠️ <b>重要注意事項：</b><br>
-    1. <b>必須使用純文字框：</b> 最下方的詳細文字<b>嚴禁使用圖片或電郵截圖</b>！若是圖片，系統無法讀取文字，會議紀錄將<b>只會顯示子題目</b>。<br>
-    2. <b>無文字時補救：</b> 若 PPT 最下方未寫文字，請於右側「草稿 / 補充說明框」手動補上文字內容。
+    <div class='guideline-card'>
+    <b>📝 模式 B：文字草稿輸入 (無 PPT 時使用)</b><br>
+    • <b>使用情境：</b>若無 PPT 簡報，可直接在草稿框內按範本的議題結構（如 1 至 10 項議題），寫下簡短文字草稿。<br>
+    • <b>處理邏輯：</b>AI 會將草稿內容精準歸納並整理至對應的議題架構中。
     </div>
     """, unsafe_allow_html=True)
 
@@ -88,7 +79,7 @@ st.caption("基於動態模板映射與純本地端下載設計")
 github_token = st.secrets.get("GITHUB_TOKEN", "")
 
 # ==========================================
-# 4. 檔案解析函式 (Docx & Pptx + Notes)
+# 4. 檔案解析函式 (Docx & Pptx)
 # ==========================================
 def extract_text_from_docx(file):
     doc = docx.Document(file)
@@ -127,14 +118,14 @@ def extract_text_from_pptx(file):
     return "\n".join(content)
 
 # ==========================================
-# 5. 使用者輸入區域 (完全替換為中性虛構範例)
+# 5. 使用者輸入區域
 # ==========================================
 st.subheader("📁 1. 上傳會議記錄格式範本 / 上次紀錄")
 format_file = st.file_uploader("請上傳作為結構基準的 Word 檔案 (.docx)", type=["docx"])
 
 st.markdown("---")
 
-st.subheader("📊 2. 輸入本次會議內容來源")
+st.subheader("📊 2. 輸入本次會議內容來源 (選擇 A 或 選擇 B)")
 col1, col2 = st.columns([1, 1])
 
 with col1:
@@ -142,9 +133,9 @@ with col1:
 
 with col2:
     current_draft_text = st.text_area(
-        "選擇 B：補充說明 / 若 PPT 最下方無文字請在此輸入",
+        "選擇 B：貼上會議草稿 (無 PPT 時使用)",
         height=160,
-        placeholder="若 PPT 頁面包含圖片/截圖，或最下方缺少詳細文字，請在此補上重點。範例：\n3.1 培訓資助：建議全數資助員工 A 及員工 B 報讀管理專業課程。"
+        placeholder="若無 PPT，請依照範本議題架構寫下草稿重點。例如：\n1. 摘要：通過上次紀錄。\n2. 招聘：本期共入職 2 名員工。\n3. 培訓：進行主管管理課程審批。"
     )
 
 # ==========================================
@@ -154,11 +145,11 @@ if st.button("🚀 即刻依範本結構生成會議記錄", type="primary", use
     if not format_file:
         st.error("🛑 請務必上傳「1. 格式範本 / 上次紀錄 (.docx)」以建立會議骨架！")
     elif not current_ppt_file and not current_draft_text.strip():
-        st.error("🛑 請提供本次會議內容，上傳 PPT 簡報或在右側文字框輸入紀錄。")
+        st.error("🛑 請提供本次會議內容，上傳 PPT 簡報（選擇 A）或輸入會議草稿（選擇 B）。")
     elif not github_token:
         st.error("🛑 系統未偵測到 GITHUB_TOKEN Secrets，請檢查 Streamlit Cloud 後台設定。")
     else:
-        with st.spinner("⏳ 正在分析範本骨架並動態映射內容..."):
+        with st.spinner("⏳ 正在分析範本骨架並歸納會議記錄..."):
             try:
                 format_structure_text = extract_text_from_docx(format_file)
                 ppt_content_text = extract_text_from_pptx(current_ppt_file) if current_ppt_file else ""
@@ -173,8 +164,9 @@ if st.button("🚀 即刻依範本結構生成會議記錄", type="primary", use
                 
                 【核心運作邏輯】：
                 1. 深度分析【格式範本/上次紀錄】，完全提取其內部使用的「編號」、「議題標題」與「表格結構」。這將作為本次會議紀錄的骨架。
-                2. 對比【本次會議內容 (包含 PPT 文字、PPT 備註欄及文字草稿)】，尋找與範本議題名稱或編號對應的最新動態、決議與數據。
-                3. 將新內容精準填入對應的編號與議題下面。如果某個議題在本次簡報、備註或草稿中完全沒有提及，請於該議題下寫「本次會議暫無相關事項。」，不可遺漏範本原有的任何一個議題大項。
+                2. 對比【本次會議內容 (PPT 簡報或文字草稿)】，將內容歸納並填入範本對應的編號與議題下。
+                3. 若上傳的是 PPT 簡報且某個頁面只有子題目而缺乏詳細內文，請直接將該子題目列入記錄即可。
+                4. 如果某個議題在本次內容中完全沒有提及，請於該議題下寫「本次會議暫無相關事項。」，不可遺漏範本原有的任何一個大項。
 
                 【排版與格式嚴格要求】：
                 1. 頁首基本資料：使用純文字 + 粗體排版，嚴禁包含管道符號（`|`）。
@@ -193,8 +185,8 @@ if st.button("🚀 即刻依範本結構生成會議記錄", type="primary", use
                 {format_structure_text}
 
                 ===【2. 本次會議內容來源】===
-                【簡報檔及備註欄提煉文字】：{ppt_content_text}
-                【文字草稿/補充說明】：{current_draft_text}
+                【簡報檔提煉文字】：{ppt_content_text}
+                【文字草稿】：{current_draft_text}
                 """
 
                 response = client.chat.completions.create(
