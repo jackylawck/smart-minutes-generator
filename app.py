@@ -5,13 +5,36 @@ from pptx import Presentation
 from openai import OpenAI
 
 # ==========================================
-# 1. 頁面配置 (ISO / Privacy-First UI)
+# 1. 頁面配置與美化 CSS (解決表格過窄換行問題)
 # ==========================================
 st.set_page_config(
     page_title="智能會議記錄生成器",
     page_icon="📝",
     layout="wide"
 )
+
+# 加入 CSS 樣式控制表格欄寬與換行
+st.markdown("""
+    <style>
+    /* 調整 Markdown 表格寬度與欄位比例 */
+    table {
+        width: 100% !important;
+        border-collapse: collapse;
+    }
+    th:nth-child(1), td:nth-child(1) {
+        width: 8% !important; /* 編號欄位 */
+        text-align: center !important;
+    }
+    th:nth-child(2), td:nth-child(2) {
+        width: 77% !important; /* 議題內容欄位 (佔據主要空間) */
+    }
+    th:nth-child(3), td:nth-child(3) {
+        width: 15% !important; /* 決議欄位 (足夠寬度不換行) */
+        text-align: center !important;
+        white-space: nowrap !important; /* 強制決議標籤不換行 */
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 st.title("📝 智能會議記錄生成器 (Smart Minutes Generator)")
 st.caption("🔒 本地端純下載版 — 遵循 Zero Data Retention 原則，不存檔至任何雲端資料庫")
@@ -115,8 +138,8 @@ if st.button("🚀 即刻生成本次會議記錄", type="primary", use_containe
 
                 2. 表格規範 (Markdown Table)：
                    - 表格標頭必須嚴格包含 3 欄：`| 編號 | 議題 | 決議 |`
-                   - 分隔線必須為：`| :--- | :--- | :--- |`
-                   - 「決議」欄位只能獨立出現以下標籤之一：（通過）、（記錄）或（跟進），嚴禁把議題內文混在決議欄。
+                   - 分隔線必須為：`| :--- | :--- | :---: |`
+                   - 「決議」欄位請精簡輸出，絕對不要包含全形括號外的任何多餘文字或換行，統一使用：（通過）、（記錄）或（跟進）。
                    - 若同一個議題有多個子項目（例：1.1, 1.2），請分行呈現在表格內，且每行的「決議」要精準對齊第 3 欄。
 
                 3. 議題分類架構：
@@ -149,7 +172,8 @@ if st.button("🚀 即刻生成本次會議記錄", type="primary", use_containe
 if "generated_minutes" in st.session_state:
     st.markdown("---")
     st.subheader("📋 會議記錄預覽 (Preview)")
-    st.markdown(st.session_state["generated_minutes"])
+    # 使用 unsafe_allow_html 讓自訂 CSS 的表格生效
+    st.markdown(st.session_state["generated_minutes"], unsafe_allow_html=True)
     
     st.markdown("---")
     st.download_button(
