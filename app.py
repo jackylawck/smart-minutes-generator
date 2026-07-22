@@ -42,24 +42,34 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. 🛡️ 左側側邊欄：標準下載、PPT 與草稿模式指引
+# 2. 🛡️ 左側側邊欄：支援 3 大商務範本下載
 # ==========================================
 with st.sidebar:
-    st.markdown("<div class='sidebar-title'>📥 下載基準範本</div>", unsafe_allow_html=True)
+    st.markdown("<div class='sidebar-title'>📥 下載基準範本 (.docx)</div>", unsafe_allow_html=True)
     
-    # 讀取根目錄的 template_weekly.docx 提供下載
-    default_template_path = "template_weekly.docx"
-    if os.path.exists(default_template_path):
-        with open(default_template_path, "rb") as f:
-            st.download_button(
-                label="📄 下載空白週會例會範本 (.docx)",
-                data=f,
-                file_name="週會例會會議記錄標準範本.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                use_container_width=True
-            )
-    else:
-        st.info("💡 若需於此處提供預設下載，請將 template_weekly.docx 上傳至 GitHub 根目錄。")
+    # 定義 3 個範本檔名與下載按鈕標題
+    templates_to_download = [
+        {"file": "template_weekly.docx", "label": "📄 下載：週會例會範本", "out": "週會例會會議記錄範本.docx"},
+        {"file": "template_board.docx", "label": "🏛️ 下載：董事會/高層決議範本", "out": "董事會高層會議記錄範本.docx"},
+        {"file": "template_project.docx", "label": "📊 下載：專案跟進檢討範本", "out": "專案檢討會議記錄範本.docx"}
+    ]
+
+    for item in templates_to_download:
+        # 相容根目錄或 templates/ 子目錄路徑
+        possible_paths = [item["file"], f"templates/{item['file']}"]
+        found_path = next((p for p in possible_paths if os.path.exists(p)), None)
+        
+        if found_path:
+            with open(found_path, "rb") as f:
+                st.download_button(
+                    label=item["label"],
+                    data=f,
+                    file_name=item["out"],
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    use_container_width=True
+                )
+        else:
+            st.caption(f"⚠️ 未偵測到 `{item['file']}`")
 
     st.markdown("---")
     st.markdown("<div class='sidebar-title'>📖 使用方式與格式指引</div>", unsafe_allow_html=True)
@@ -154,7 +164,6 @@ if template_option == "內建標準範本 (免上傳)":
         ]
     )
     
-    # 自動相容 templates/ 資料夾與 GitHub 根目錄檔名
     template_map = {
         "通用團隊例會/週會範本 (Weekly / Team Meeting)": ["template_weekly.docx", "templates/template_weekly.docx", "meeting_template.docx"],
         "高層/董事會決議型範本 (Board / Governance)": ["template_board.docx", "templates/template_board.docx"],
