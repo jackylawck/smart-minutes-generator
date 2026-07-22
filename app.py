@@ -47,8 +47,8 @@ st.markdown("""
 with st.sidebar:
     st.markdown("<div class='sidebar-title'>📥 下載基準範本</div>", unsafe_allow_html=True)
     
-    # 嘗試讀取預設範本 meeting_template.docx 提供下載
-    default_template_path = "meeting_template.docx"
+    # 讀取根目錄的 template_weekly.docx 提供下載
+    default_template_path = "template_weekly.docx"
     if os.path.exists(default_template_path):
         with open(default_template_path, "rb") as f:
             st.download_button(
@@ -59,7 +59,7 @@ with st.sidebar:
                 use_container_width=True
             )
     else:
-        st.info("💡 若需於此處提供預設下載，請將 meeting_template.docx 上傳至 GitHub 根目錄。")
+        st.info("💡 若需於此處提供預設下載，請將 template_weekly.docx 上傳至 GitHub 根目錄。")
 
     st.markdown("---")
     st.markdown("<div class='sidebar-title'>📖 使用方式與格式指引</div>", unsafe_allow_html=True)
@@ -154,10 +154,11 @@ if template_option == "內建標準範本 (免上傳)":
         ]
     )
     
+    # 自動相容 templates/ 資料夾與 GitHub 根目錄檔名
     template_map = {
-        "通用團隊例會/週會範本 (Weekly / Team Meeting)": ["templates/template_weekly.docx", "template_weekly.docx", "meeting_template.docx"],
-        "高層/董事會決議型範本 (Board / Governance)": ["templates/template_board.docx", "template_board.docx"],
-        "專案跟進與檢討型範本 (Project / Deliverables)": ["templates/template_project.docx", "template_project.docx"]
+        "通用團隊例會/週會範本 (Weekly / Team Meeting)": ["template_weekly.docx", "templates/template_weekly.docx", "meeting_template.docx"],
+        "高層/董事會決議型範本 (Board / Governance)": ["template_board.docx", "templates/template_board.docx"],
+        "專案跟進與檢討型範本 (Project / Deliverables)": ["template_project.docx", "templates/template_project.docx"]
     }
     
     candidate_paths = template_map.get(builtin_template, [])
