@@ -2,3 +2,4 @@ streamlit
 python-docx
 python-pptx
 openai
+markdown
