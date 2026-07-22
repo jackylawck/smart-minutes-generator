@@ -61,7 +61,7 @@ with st.sidebar:
     
     st.markdown("<div class='guideline-card'><b>💡 指引一：格式範本文件</b><br>上傳一份標準格式或上次的會議記錄（.docx）。AI 會精確複製其「編號」與「題目題目」，確保跨會議的結構完全一致。</div>", unsafe_allow_html=True)
     
-    st.markdown("<div class='guideline-card'><b>💡 指引二：內容對齊技巧</b><br>• <b>簡報檔 (PPTX)：** 簡報內的頁標題或內容，若能與範本的議題名稱「關鍵字對齊」，AI 的擷取精準度會最高。<br>• <b>無簡報情境 (Draft Post)：** 若沒有 PPT，請直接在右側文字框，依照範本題目順序，簡單寫下紀錄或 Bullet Points 即可。</div>", unsafe_allow_html=True)
+    st.markdown("<div class='guideline-card'><b>💡 指引二：內容對齊技巧</b><br>• <b>簡報檔 (PPTX)：</b> 簡報內的頁標題或內容，若能與範本的議題名稱「關鍵字對齊」，AI 的擷取精準度會最高。<br>• <b>圖片頁面補充：</b> 若 PPT 頁面包含圖片/截圖，可將重點文字貼在 PPT 下方的「備註欄 (Notes)」，AI 能自動讀取！<br>• <b>無簡報情境 (Draft Post)：</b> 若沒有 PPT，請直接在右側文字框，依照範本題目順序，簡單寫下紀錄或 Bullet Points 即可。</div>", unsafe_allow_html=True)
 
     st.markdown("---")
     st.caption("🔒 **ISO 數據安全聲明：** 記憶體即時運算，關閉網頁即時銷毀，絕不回傳 GitHub 儲存庫。")
@@ -76,7 +76,7 @@ st.caption("基於動態模板映射與純本地端下載設計")
 github_token = st.secrets.get("GITHUB_TOKEN", "")
 
 # ==========================================
-# 4. 檔案解析函式 (Docx & Pptx)
+# 4. 檔案解析函式 (Docx & Pptx + Notes)
 # ==========================================
 def extract_text_from_docx(file):
     doc = docx.Document(file)
@@ -96,16 +96,26 @@ def extract_text_from_pptx(file):
     content = []
     for idx, slide in enumerate(prs.slides, start=1):
         content.append(f"\n--- [ Slide {idx} ] ---")
+        
+        # 1. 讀取投影片文字方塊
         for shape in slide.shapes:
             if shape.has_text_frame:
                 for p in shape.text_frame.paragraphs:
                     if p.text.strip():
                         content.append(p.text.strip())
+            # 2. 讀取原生表格
             if shape.has_table:
                 for row in shape.table.rows:
                     row_data = [cell.text.strip().replace('\n', ' ') for cell in row.cells]
                     if any(row_data):
                         content.append(" | ".join(row_data))
+                        
+        # 3. 讀取投影片備註欄 (Notes)，防止圖片/截圖頁面的補充文字遺漏
+        if slide.has_notes_slide and slide.notes_slide.notes_text_frame:
+            notes_text = slide.notes_slide.notes_text_frame.text.strip()
+            if notes_text:
+                content.append(f"[備註/補充說明]: {notes_text}")
+                
     return "\n".join(content)
 
 # ==========================================
@@ -128,7 +138,7 @@ with col2:
     current_draft_text = st.text_area(
         "選擇 B：直接貼上本次會議草稿 / 簡短 Post 紀錄",
         height=160,
-        placeholder="若無 PPT，可依範本題目分段寫下重點。例如：\n1. 摘要：通過上次紀錄。\n2. 招聘與人資：下週經理到職。"
+        placeholder="若無 PPT，或 PPT 頁面包含圖片截圖，可在此直接打字補充重點。例如：\n1. 摘要：通過上次紀錄。\n2. 培訓：建議 $3,000 以下培訓資助由 HR 經理及營運總經理審批，免董事經理簽署。"
     )
 
 # ==========================================
@@ -158,8 +168,8 @@ if st.button("🚀 即刻依範本結構生成會議記錄", type="primary", use
                 
                 【核心運作邏輯】：
                 1. 深度分析【格式範本/上次紀錄】，完全提取其內部使用的「編號」、「議題標題」與「表格結構」。這將作為本次會議紀錄的骨架。
-                2. 對比【本次會議內容 (PPT及文字草稿)】，尋找與範本議題名稱或編號對應的最新動態、決議與數據。
-                3. 將新內容精準填入對應的編號與議題下面。如果某個議題在本次簡報或草稿中完全沒有提及，請於該議題下寫「本次會議暫無相關事項。」，不可遺漏範本原有的任何一個議題大項。
+                2. 對比【本次會議內容 (包含 PPT 文字、PPT 備註欄及文字草稿)】，尋找與範本議題名稱或編號對應的最新動態、決議與數據。
+                3. 將新內容精準填入對應的編號與議題下面。如果某個議題在本次簡報、備註或草稿中完全沒有提及，請於該議題下寫「本次會議暫無相關事項。」，不可遺漏範本原有的任何一個議題大項。
 
                 【排版與格式嚴格要求】：
                 1. 頁首基本資料：使用純文字 + 粗體排版，嚴禁包含管道符號（`|`）。
@@ -178,8 +188,8 @@ if st.button("🚀 即刻依範本結構生成會議記錄", type="primary", use
                 {format_structure_text}
 
                 ===【2. 本次會議內容來源】===
-                【簡報檔提煉文字】：{ppt_content_text}
-                【文字草稿/簡短Post】：{current_draft_text}
+                【簡報檔及備註欄提煉文字】：{ppt_content_text}
+                【文字草稿/補充說明】：{current_draft_text}
                 """
 
                 response = client.chat.completions.create(
