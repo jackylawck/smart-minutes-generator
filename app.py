@@ -1,6 +1,12 @@
 import os
+import io
+import re
 import streamlit as st
 import docx
+from docx import Document
+from docx.shared import Pt, Inches, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_TABLE_ALIGNMENT, WD_ALIGN_VERTICAL
 from pptx import Presentation
 from openai import OpenAI
 
@@ -47,7 +53,6 @@ st.markdown("""
 with st.sidebar:
     st.markdown("<div class='sidebar-title'>📥 下載基準範本 (.docx)</div>", unsafe_allow_html=True)
     
-    # 定義 3 個範本檔名與下載按鈕標題
     templates_to_download = [
         {"file": "template_weekly.docx", "label": "📄 下載：週會例會範本", "out": "週會例會會議記錄範本.docx"},
         {"file": "template_board.docx", "label": "🏛️ 下載：董事會/高層決議範本", "out": "董事會高層會議記錄範本.docx"},
@@ -55,7 +60,6 @@ with st.sidebar:
     ]
 
     for item in templates_to_download:
-        # 相容根目錄或 templates/ 子目錄路徑
         possible_paths = [item["file"], f"templates/{item['file']}"]
         found_path = next((p for p in possible_paths if os.path.exists(p)), None)
         
@@ -103,7 +107,7 @@ st.caption("基於動態模板映射與純本地端下載設計")
 github_token = st.secrets.get("GITHUB_TOKEN", "")
 
 # ==========================================
-# 4. 檔案解析函式 (Docx & Pptx)
+# 4. 檔案解析與 Word 轉換轉換函式
 # ==========================================
 def extract_text_from_docx(file):
     doc = docx.Document(file)
@@ -140,6 +144,108 @@ def extract_text_from_pptx(file):
                 content.append(f"[備註/補充說明]: {notes_text}")
                 
     return "\n".join(content)
+
+def convert_md_to_docx(md_text):
+    """將 Markdown 內容轉換為高質感 Word (.docx) 文件"""
+    doc = Document()
+    lines = md_text.strip().split('\n')
+    
+    in_table = False
+    table_data = []
+    
+    for line in lines:
+        line_str = line.strip()
+        
+        # 處理表格行
+        if line_str.startswith('|') and line_str.endswith('|'):
+            # 過濾 Markdown 表格的分隔線
+            if re.match(r'^\|[\s\:\-\|]+\|$', line_str):
+                continue
+            cells = [c.strip() for c in line_str.strip('|').split('|')]
+            table_data.append(cells)
+            in_table = True
+            continue
+        else:
+            # 如果結束表格區域，先將累積的表格數據寫入 Docx
+            if in_table and table_data:
+                table = doc.add_table(rows=len(table_data), cols=len(table_data[0]))
+                table.style = 'Table Grid'
+                table.alignment = WD_TABLE_ALIGNMENT.CENTER
+                
+                for r_idx, row_cells in enumerate(table_data):
+                    for c_idx, cell_value in enumerate(row_cells):
+                        cell = table.cell(r_idx, c_idx)
+                        # 清理內文加粗標籤
+                        clean_text = cell_value.replace('**', '').replace('<br>', '\n')
+                        cell.text = clean_text
+                        cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+                        
+                        # 標頭樣式
+                        if r_idx == 0:
+                            for paragraph in cell.paragraphs:
+                                paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                                for run in paragraph.runs:
+                                    run.font.bold = True
+                        else:
+                            # 欄位對齊：第一欄居中、第三欄居中
+                            if c_idx == 0 or c_idx == len(row_cells) - 1:
+                                for paragraph in cell.paragraphs:
+                                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                
+                table_data = []
+                in_table = False
+                doc.add_paragraph() # 增加空行
+                
+        if not line_str:
+            continue
+            
+        # 處理標題
+        if line_str.startswith('# '):
+            p = doc.add_paragraph()
+            run = p.add_run(line_str.replace('# ', '').strip())
+            run.font.size = Pt(18)
+            run.font.bold = True
+            run.font.color.rgb = RGBColor(0x1A, 0x36, 0x5D)
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        elif line_str.startswith('## '):
+            p = doc.add_paragraph()
+            run = p.add_run(line_str.replace('## ', '').strip())
+            run.font.size = Pt(14)
+            run.font.bold = True
+            run.font.color.rgb = RGBColor(0x00, 0x56, 0xB3)
+        elif line_str.startswith('---'):
+            doc.add_paragraph("____________________________________________________")
+        else:
+            p = doc.add_paragraph()
+            # 清除粗體標號 (**文字**) 轉換為 Word 粗體
+            parts = re.split(r'(\*\*.*?\*\*)', line_str)
+            for part in parts:
+                if part.startswith('**') and part.endswith('**'):
+                    run = p.add_run(part[2:-2])
+                    run.font.bold = True
+                else:
+                    p.add_run(part)
+
+    # 處理文末留存的表格數據
+    if in_table and table_data:
+        table = doc.add_table(rows=len(table_data), cols=len(table_data[0]))
+        table.style = 'Table Grid'
+        table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        for r_idx, row_cells in enumerate(table_data):
+            for c_idx, cell_value in enumerate(row_cells):
+                cell = table.cell(r_idx, c_idx)
+                clean_text = cell_value.replace('**', '').replace('<br>', '\n')
+                cell.text = clean_text
+                if r_idx == 0:
+                    for paragraph in cell.paragraphs:
+                        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        for run in paragraph.runs:
+                            run.font.bold = True
+
+    bio = io.BytesIO()
+    doc.save(bio)
+    bio.seek(0)
+    return bio
 
 # ==========================================
 # 5. 使用者輸入區域 (多範本選擇)
@@ -269,7 +375,7 @@ if st.button("🚀 即刻依範本結構生成會議記錄", type="primary", use
                 st.error(f"❌ 生成失敗，請確認資料內容或 Token 設定: {str(e)}")
 
 # ==========================================
-# 7. 本地端純下載預覽
+# 7. 本地端純下載預覽 (支援 Word .docx & .md 下載)
 # ==========================================
 if "generated_minutes" in st.session_state:
     st.markdown("---")
@@ -277,11 +383,27 @@ if "generated_minutes" in st.session_state:
     st.markdown(st.session_state["generated_minutes"], unsafe_allow_html=True)
     
     st.markdown("---")
-    st.download_button(
-        label="📥 即刻下載通用格式會議記錄 (.md)",
-        data=st.session_state["generated_minutes"],
-        file_name="本次會議記錄.md",
-        mime="text/markdown",
-        type="primary",
-        use_container_width=True
-    )
+    
+    # 建立 Word (.docx) 檔案
+    docx_file = convert_md_to_docx(st.session_state["generated_minutes"])
+    
+    col_d1, col_d2 = st.columns([2, 1])
+    
+    with col_d1:
+        st.download_button(
+            label="📄 即刻下載標準 Word 格式會議記錄 (.docx)",
+            data=docx_file,
+            file_name="本次會議記錄.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            type="primary",
+            use_container_width=True
+        )
+        
+    with col_d2:
+        st.download_button(
+            label="📥 下載 Markdown 原始檔 (.md)",
+            data=st.session_state["generated_minutes"],
+            file_name="本次會議記錄.md",
+            mime="text/markdown",
+            use_container_width=True
+        )
