@@ -107,7 +107,7 @@ st.caption("基於動態模板映射與純本地端下載設計")
 github_token = st.secrets.get("GITHUB_TOKEN", "")
 
 # ==========================================
-# 4. 檔案解析與 Word 轉換轉換函式
+# 4. 檔案解析與 Word 轉換函式
 # ==========================================
 def extract_text_from_docx(file):
     doc = docx.Document(file)
@@ -146,19 +146,25 @@ def extract_text_from_pptx(file):
     return "\n".join(content)
 
 def convert_md_to_docx(md_text):
-    """將 Markdown 內容轉換為高質感 Word (.docx) 文件"""
+    """將 Markdown 內容轉換為高質感、商業級排版的 Word (.docx) 文件"""
     doc = Document()
-    lines = md_text.strip().split('\n')
     
+    # 設定頁面邊距 (2.54 cm 標準邊距)
+    for section in doc.sections:
+        section.top_margin = Inches(1)
+        section.bottom_margin = Inches(1)
+        section.left_margin = Inches(1)
+        section.right_margin = Inches(1)
+
+    lines = md_text.strip().split('\n')
     in_table = False
     table_data = []
-    
+
     for line in lines:
         line_str = line.strip()
         
-        # 處理表格行
+        # 識別 Markdown 表格行
         if line_str.startswith('|') and line_str.endswith('|'):
-            # 過濾 Markdown 表格的分隔線
             if re.match(r'^\|[\s\:\-\|]+\|$', line_str):
                 continue
             cells = [c.strip() for c in line_str.strip('|').split('|')]
@@ -166,81 +172,114 @@ def convert_md_to_docx(md_text):
             in_table = True
             continue
         else:
-            # 如果結束表格區域，先將累積的表格數據寫入 Docx
+            # 渲染表格
             if in_table and table_data:
                 table = doc.add_table(rows=len(table_data), cols=len(table_data[0]))
                 table.style = 'Table Grid'
                 table.alignment = WD_TABLE_ALIGNMENT.CENTER
                 
+                # 設定精確欄寬比例：編號 0.8 吋 | 議題 4.8 吋 | 決議 1.0 吋
+                col_widths = [Inches(0.8), Inches(4.8), Inches(1.0)]
+
                 for r_idx, row_cells in enumerate(table_data):
+                    row = table.rows[r_idx]
+                    
+                    # 防止表格跨頁斷裂
+                    trPr = row._tr.get_or_add_trPr()
+                    trPr.append(docx.oxml.OxmlElement('w:cantSplit'))
+
                     for c_idx, cell_value in enumerate(row_cells):
-                        cell = table.cell(r_idx, c_idx)
-                        # 清理內文加粗標籤
+                        cell = row.cells[c_idx]
+                        if c_idx < len(col_widths):
+                            cell.width = col_widths[c_idx]
+                            
                         clean_text = cell_value.replace('**', '').replace('<br>', '\n')
                         cell.text = clean_text
                         cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-                        
-                        # 標頭樣式
+
+                        # 段落樣式與行距控制
+                        p = cell.paragraphs[0]
+                        p.paragraph_format.space_before = Pt(3)
+                        p.paragraph_format.space_after = Pt(3)
+                        p.paragraph_format.line_spacing = 1.15
+
+                        # 標頭列 (Header) 深藍底白字美化
                         if r_idx == 0:
-                            for paragraph in cell.paragraphs:
-                                paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                                for run in paragraph.runs:
-                                    run.font.bold = True
+                            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                            for run in p.runs:
+                                run.font.bold = True
+                                run.font.size = Pt(10.5)
+                                run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF) # 白字
+                            
+                            # 背景色填滿：深藍色 (#1A365D)
+                            shading = docx.oxml.parse_xml(r'<w:shd {} w:fill="1A365D"/>'.format(docx.oxml.ns.nsdecls('w')))
+                            cell._tc.get_or_add_tcPr().append(shading)
+                            
+                            # 跨頁自動重複標頭
+                            trPr.append(docx.oxml.OxmlElement('w:tblHeader'))
                         else:
-                            # 欄位對齊：第一欄居中、第三欄居中
+                            # 編號與決議欄位居中對齊
                             if c_idx == 0 or c_idx == len(row_cells) - 1:
-                                for paragraph in cell.paragraphs:
-                                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                
+                                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                            for run in p.runs:
+                                run.font.size = Pt(9.5)
+
                 table_data = []
                 in_table = False
-                doc.add_paragraph() # 增加空行
-                
+                doc.add_paragraph() # 表格後空行
+
         if not line_str:
             continue
-            
-        # 處理標題
+
+        # 頁頭大標題
         if line_str.startswith('# '):
             p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p.paragraph_format.space_after = Pt(12)
             run = p.add_run(line_str.replace('# ', '').strip())
             run.font.size = Pt(18)
             run.font.bold = True
             run.font.color.rgb = RGBColor(0x1A, 0x36, 0x5D)
-            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        elif line_str.startswith('## '):
-            p = doc.add_paragraph()
-            run = p.add_run(line_str.replace('## ', '').strip())
-            run.font.size = Pt(14)
-            run.font.bold = True
-            run.font.color.rgb = RGBColor(0x00, 0x56, 0xB3)
-        elif line_str.startswith('---'):
-            doc.add_paragraph("____________________________________________________")
+        # 基本資料段落 (日期、時間、出席人等)
         else:
             p = doc.add_paragraph()
-            # 清除粗體標號 (**文字**) 轉換為 Word 粗體
+            p.paragraph_format.space_after = Pt(2)
             parts = re.split(r'(\*\*.*?\*\*)', line_str)
             for part in parts:
                 if part.startswith('**') and part.endswith('**'):
                     run = p.add_run(part[2:-2])
                     run.font.bold = True
+                    run.font.size = Pt(10)
                 else:
-                    p.add_run(part)
+                    run = p.add_run(part)
+                    run.font.size = Pt(10)
 
-    # 處理文末留存的表格數據
+    # 處理尾端表格數據
     if in_table and table_data:
         table = doc.add_table(rows=len(table_data), cols=len(table_data[0]))
         table.style = 'Table Grid'
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        col_widths = [Inches(0.8), Inches(4.8), Inches(1.0)]
+
         for r_idx, row_cells in enumerate(table_data):
+            row = table.rows[r_idx]
             for c_idx, cell_value in enumerate(row_cells):
-                cell = table.cell(r_idx, c_idx)
+                cell = row.cells[c_idx]
+                if c_idx < len(col_widths):
+                    cell.width = col_widths[c_idx]
                 clean_text = cell_value.replace('**', '').replace('<br>', '\n')
                 cell.text = clean_text
+                p = cell.paragraphs[0]
                 if r_idx == 0:
-                    for paragraph in cell.paragraphs:
-                        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                        for run in paragraph.runs:
-                            run.font.bold = True
+                    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    for run in p.runs:
+                        run.font.bold = True
+                        run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+                    shading = docx.oxml.parse_xml(r'<w:shd {} w:fill="1A365D"/>'.format(docx.oxml.ns.nsdecls('w')))
+                    cell._tc.get_or_add_tcPr().append(shading)
+                else:
+                    if c_idx == 0 or c_idx == len(row_cells) - 1:
+                        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     bio = io.BytesIO()
     doc.save(bio)
@@ -375,7 +414,7 @@ if st.button("🚀 即刻依範本結構生成會議記錄", type="primary", use
                 st.error(f"❌ 生成失敗，請確認資料內容或 Token 設定: {str(e)}")
 
 # ==========================================
-# 7. 本地端純下載預覽 (支援 Word .docx & .md 下載)
+# 7. 本地端純下載預覽 (預設提供 Word .docx 下載)
 # ==========================================
 if "generated_minutes" in st.session_state:
     st.markdown("---")
@@ -384,7 +423,7 @@ if "generated_minutes" in st.session_state:
     
     st.markdown("---")
     
-    # 建立 Word (.docx) 檔案
+    # 即時生成高質感 Word (.docx) 檔案
     docx_file = convert_md_to_docx(st.session_state["generated_minutes"])
     
     col_d1, col_d2 = st.columns([2, 1])
