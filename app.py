@@ -8,7 +8,7 @@ from openai import OpenAI
 # 1. 頁面配置與美化 CSS
 # ==========================================
 st.set_page_config(
-    page_title="通用智能會議記錄生成器",
+    page_title="智能會議記錄生成器",
     page_icon="📝",
     layout="wide"
 )
@@ -86,7 +86,7 @@ with st.sidebar:
 # ==========================================
 # 3. 主畫面介面
 # ==========================================
-st.title("📝 通用智能會議記錄生成器 (Smart Minutes Generator)")
+st.title("📝 智能會議記錄生成器 (Smart Minutes Generator)")
 st.caption("基於動態模板映射與純本地端下載設計")
 
 github_token = st.secrets.get("GITHUB_TOKEN", "")
