@@ -5,54 +5,80 @@ from pptx import Presentation
 from openai import OpenAI
 
 # ==========================================
-# 1. 頁面配置與美化 CSS (解決表格過窄換行問題)
+# 1. 頁面配置與美化 CSS (確保表格不跑版、決議不換行)
 # ==========================================
 st.set_page_config(
-    page_title="智能會議記錄生成器",
+    page_title="通用智能會議記錄生成器",
     page_icon="📝",
     layout="wide"
 )
 
-# 加入 CSS 樣式控制表格欄寬與換行
 st.markdown("""
     <style>
-    /* 調整 Markdown 表格寬度與欄位比例 */
+    /* 側邊欄樣式優化 */
+    .sidebar-title {
+        color: #1a365d;
+        font-weight: bold;
+        font-size: 1.2em;
+        margin-bottom: 10px;
+    }
+    .guideline-card {
+        background-color: #f8f9fa;
+        padding: 12px;
+        border-radius: 6px;
+        border-left: 4px solid #17a2b8;
+        margin-bottom: 15px;
+        font-size: 0.9em;
+    }
+    /* 表格比例與換行控制 */
     table {
         width: 100% !important;
         border-collapse: collapse;
     }
     th:nth-child(1), td:nth-child(1) {
-        width: 8% !important; /* 編號欄位 */
+        width: 8% !important;
         text-align: center !important;
     }
     th:nth-child(2), td:nth-child(2) {
-        width: 77% !important; /* 議題內容欄位 (佔據主要空間) */
+        width: 77% !important;
     }
     th:nth-child(3), td:nth-child(3) {
-        width: 15% !important; /* 決議欄位 (足夠寬度不換行) */
+        width: 15% !important;
         text-align: center !important;
         white-space: nowrap !important; /* 強制決議標籤不換行 */
     }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📝 智能會議記錄生成器 (Smart Minutes Generator)")
-st.caption("🔒 本地端純下載版 — 遵循 Zero Data Retention 原則，不存檔至任何雲端資料庫")
+# ==========================================
+# 2. 🛡️ 左側側邊欄：動態指引與標準格式說明
+# ==========================================
+with st.sidebar:
+    st.markdown("<div class='sidebar-title'>📖 智能對齊指引</div>", unsafe_allow_html=True)
+    st.markdown("""
+    本系統採用**「動態結構映射」**技術。AI 會自動閱讀您上傳的格式範本，提取其**編號與議題**作為骨架，再填入本次內容。
+    """)
+    
+    st.markdown("<div class='guideline-card'><b>💡 指引一：格式範本文件</b><br>上傳一份標準格式或上次的會議記錄（.docx）。AI 會精確複製其「編號」與「題目題目」，確保跨會議的結構完全一致。</div>", unsafe_allow_html=True)
+    
+    st.markdown("<div class='guideline-card'><b>💡 指引二：內容對齊技巧</b><br>• <b>簡報檔 (PPTX)：** 簡報內的頁標題或內容，若能與範本的議題名稱「關鍵字對齊」，AI 的擷取精準度會最高。<br>• <b>無簡報情境 (Draft Post)：** 若沒有 PPT，請直接在右側文字框，依照範本題目順序，簡單寫下紀錄或 Bullet Points 即可。</div>", unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.caption("🔒 **ISO 數據安全聲明：** 記憶體即時運算，關閉網頁即時銷毀，絕不回傳 GitHub 儲存庫。")
+
+# ==========================================
+# 3. 主畫面介面
+# ==========================================
+st.title("📝 通用智能會議記錄生成器 (Smart Minutes Generator)")
+st.caption("基於動態模板映射與純本地端下載設計")
 
 # 從 Streamlit Secrets 讀取免費 AI API Token
 github_token = st.secrets.get("GITHUB_TOKEN", "")
 
-st.info(
-    "🛡️ **ISO 數據安全與隱私保障聲明：**\n"
-    "1. 本系統採用 **Session-Only 記憶體處理**，您上傳的 Word 及 PPT 檔案僅供本次 AI 提煉使用。\n"
-    "2. 生成結果**絕對不會回傳或 Commit 至任何 GitHub Repository**，請安心直接下載至公司內部安全硬碟。"
-)
-
 # ==========================================
-# 2. 記憶體解析 Word & PPT 函式
+# 4. 檔案解析函式 (Docx & Pptx)
 # ==========================================
 def extract_text_from_docx(file):
-    """讀取 Word 檔案之段落與表格內容"""
     doc = docx.Document(file)
     content = []
     for p in doc.paragraphs:
@@ -66,7 +92,6 @@ def extract_text_from_docx(file):
     return "\n".join(content)
 
 def extract_text_from_pptx(file):
-    """讀取 PPTX 簡報之內文與數據表格"""
     prs = Presentation(file)
     content = []
     for idx, slide in enumerate(prs.slides, start=1):
@@ -84,76 +109,83 @@ def extract_text_from_pptx(file):
     return "\n".join(content)
 
 # ==========================================
-# 3. 側邊欄：議題設定
+# 5. 使用者輸入區域
 # ==========================================
-with st.sidebar:
-    st.header("📋 會議架構設定")
-    custom_agenda = st.text_area(
-        "預設會議議題分類:",
-        value="1. 摘要\n2. 招聘與人資\n3. 培訓與發展\n4. 財務與薪酬\n5. 員工福利\n6. 績效考核\n7. 離職與異動\n8. 營運與系統\n9. 規章制度與合規\n10. 其他事項",
-        height=220
+# 步驟 1：定義骨架
+st.subheader("📁 1. 上傳會議記錄格式範本 / 上次紀錄")
+format_file = st.file_uploader("請上傳作為結構基準的 Word 檔案 (.docx)", type=["docx"])
+
+st.markdown("---")
+
+# 步驟 2：提供內容來源 (支援 PPT 或文字草稿)
+st.subheader("📊 2. 輸入本次會議內容來源 (可單選或組合使用)")
+col1, col2 = st.columns([1, 1])
+
+with col1:
+    current_ppt_file = st.file_uploader("選擇 A：上傳本次會議簡報 (.pptx)", type=["pptx"])
+
+with col2:
+    current_draft_text = st.text_area(
+        "選擇 B：直接貼上本次會議草稿 / 簡短 Post 紀錄",
+        height=160,
+        placeholder="若無 PPT，可依範本題目分段寫下重點。例如：\n1. 摘要：通過上次紀錄。\n2. 招聘與人資：下週經理到職。"
     )
 
 # ==========================================
-# 4. 主介面：檔案上傳
+# 6. AI 動態對齊生成邏輯
 # ==========================================
-col1, col2 = st.columns(2)
-with col1:
-    last_minutes_file = st.file_uploader("1. 上傳上次會議記錄 (.docx)", type=["docx"])
-with col2:
-    current_ppt_file = st.file_uploader("2. 上傳本次會議簡報 (.pptx)", type=["pptx"])
-
-# ==========================================
-# 5. AI 記憶體運算邏輯
-# ==========================================
-if st.button("🚀 即刻生成本次會議記錄", type="primary", use_container_width=True):
-    if not last_minutes_file or not current_ppt_file:
-        st.error("🛑 請務必同時上傳「上次會議記錄」與「本次 PPT」！")
+if st.button("🚀 即刻依範本結構生成會議記錄", type="primary", use_container_width=True):
+    if not format_file:
+        st.error("🛑 請務必上傳「1. 格式範本 / 上次紀錄 (.docx)」以建立會議骨架！")
+    elif not current_ppt_file and not current_draft_text.strip():
+        st.error("🛑 請提供本次會議內容，上傳 PPT 簡報或在草稿框輸入紀錄（二選一）。")
     elif not github_token:
-        st.error("🛑 系統未設定 GITHUB_TOKEN Secrets，請聯絡系統管理者。")
+        st.error("🛑 系統未偵測到 GITHUB_TOKEN Secrets，請檢查 Streamlit Cloud 後台設定。")
     else:
-        with st.spinner("⏳ 正在於記憶體進行資料比對與 AI 生成..."):
+        with st.spinner("⏳ 正在分析範本骨架並動態映射會議內容..."):
             try:
-                last_text = extract_text_from_docx(last_minutes_file)
-                ppt_text = extract_text_from_pptx(current_ppt_file)
+                # 提取骨架與新內容
+                format_structure_text = extract_text_from_docx(format_file)
+                ppt_content_text = extract_text_from_pptx(current_ppt_file) if current_ppt_file else ""
 
                 client = OpenAI(
                     base_url="https://models.inference.ai.azure.com",
                     api_key=github_token,
                 )
 
-                system_prompt = f"""
-                你是一名專業的企業行政秘書。
-                請參考「上次會議記錄」的格式、風格與歷史數據，結合「本次會議 PPT」的最新內容，
-                撰寫一份結構嚴謹、排版完美符合 Markdown 語法的正式會議記錄。
+                system_prompt = """
+                你是一名精通企業行政與結構化合規管理的高級秘書。你的任務是進行「動態結構映射與內容提煉」。
+                
+                【核心運作邏輯】：
+                1. 深度分析【格式範本/上次紀錄】，完全提取其內部使用的「編號」、「議題標題」與「表格結構」。這將作為本次會議紀錄的骨架。
+                2. 對比【本次會議內容 (PPT及文字草稿)】，尋找與範本議題名稱或編號對應的最新動態、決議與數據。
+                3. 將新內容精準填入對應的編號與議題下面。如果某個議題在本次簡報或草稿中完全沒有提及，請於該議題下寫「本次會議暫無相關事項。」，不可遺漏範本原有的任何一個議題大項。
 
                 【排版與格式嚴格要求】：
-                1. 頁首基本資料：請使用純文字 + 粗體排版，絕對不要包含管道符號（`|`）。範例：
-                   **日期：** 2026年6月17日（星期三）
-                   **時間：** 上午11:00至下午1:00
-                   **地點：** 會議室
-                   **主持人：** [姓名] ([職銜])
-                   **出席人：** [姓名] ([職銜])
-                   **紀錄人：** [姓名] ([職銜])
-
+                1. 頁首基本資料：使用純文字 + 粗體排版，嚴禁包含管道符號（`|`）。
                 2. 表格規範 (Markdown Table)：
                    - 表格標頭必須嚴格包含 3 欄：`| 編號 | 議題 | 決議 |`
                    - 分隔線必須為：`| :--- | :--- | :---: |`
-                   - 「決議」欄位請精簡輸出，絕對不要包含全形括號外的任何多餘文字或換行，統一使用：（通過）、（記錄）或（跟進）。
-                   - 若同一個議題有多個子項目（例：1.1, 1.2），請分行呈現在表格內，且每行的「決議」要精準對齊第 3 欄。
+                   - 「決議」欄位請精簡輸出，只允許出現：（通過）、（記錄）或（跟進）這三個標籤，嚴禁把議題內文混在決議欄。
+                   - 同議題下的子項目請分行呈現，確保每行的「決議」精確對齊第 3 欄。
+                3. 語言：繁體中文（專業企業語彙）。
+                """
 
-                3. 議題分類架構：
-                   請嚴格採用以下議題分類：
-                   {custom_agenda}
+                user_prompt = f"""
+                請完全依照【格式範本】的編號與議題大項，將【本次會議內容】進行歸納填寫，產出全新的會議記錄：
 
-                4. 數據精確度：人數變動、異動名單及各項專案進度必須嚴格按 PPT 內容與數據計算，切勿虛構。
-                5. 語言：繁體中文（專業企業語彙）。
+                ===【1. 格式範本 / 上次紀錄 (定義本次會議的編號與議題骨架)】===
+                {format_structure_text}
+
+                ===【2. 本次會議內容來源】===
+                【簡報檔提煉文字】：{ppt_content_text}
+                【文字草稿/簡短Post】：{current_draft_text}
                 """
 
                 response = client.chat.completions.create(
                     messages=[
                         {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": f"【上次紀錄】:\n{last_text}\n\n【本次PPT內容】:\n{ppt_text}"}
+                        {"role": "user", "content": user_prompt}
                     ],
                     model="gpt-4o-mini",
                     temperature=0.2,
@@ -161,23 +193,22 @@ if st.button("🚀 即刻生成本次會議記錄", type="primary", use_containe
 
                 minutes_md = response.choices[0].message.content
                 st.session_state["generated_minutes"] = minutes_md
-                st.success("✨ 本次會議記錄已順利生成！")
+                st.success("✨ 本次會議記錄已根據範本結構成功生成！")
 
             except Exception as e:
-                st.error(f"❌ 生成失敗，請檢查 API 設定或檔案內容: {str(e)}")
+                st.error(f"❌ 生成失敗，請確認資料內容或 Token 設定: {str(e)}")
 
 # ==========================================
-# 6. 本地端純下載（ISO 零數據留存設計）
+# 7. 本地端純下載預覽 (ISO 零數據留存設計)
 # ==========================================
 if "generated_minutes" in st.session_state:
     st.markdown("---")
     st.subheader("📋 會議記錄預覽 (Preview)")
-    # 使用 unsafe_allow_html 讓自訂 CSS 的表格生效
     st.markdown(st.session_state["generated_minutes"], unsafe_allow_html=True)
     
     st.markdown("---")
     st.download_button(
-        label="📥 即刻下載 Markdown 檔 (保存至本地端硬碟)",
+        label="📥 即刻下載通用格式會議記錄 (.md)",
         data=st.session_state["generated_minutes"],
         file_name="本次會議記錄.md",
         mime="text/markdown",
