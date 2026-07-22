@@ -5,7 +5,7 @@ from pptx import Presentation
 from openai import OpenAI
 
 # ==========================================
-# 1. 頁面配置與美化 CSS (確保表格不跑版、決議不換行)
+# 1. 頁面配置與美化 CSS
 # ==========================================
 st.set_page_config(
     page_title="通用智能會議記錄生成器",
@@ -15,7 +15,6 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-    /* 側邊欄樣式優化 */
     .sidebar-title {
         color: #1a365d;
         font-weight: bold;
@@ -23,48 +22,62 @@ st.markdown("""
         margin-bottom: 10px;
     }
     .guideline-card {
-        background-color: #f8f9fa;
+        background-color: #ffffff;
         padding: 12px;
         border-radius: 6px;
-        border-left: 4px solid #17a2b8;
-        margin-bottom: 15px;
-        font-size: 0.9em;
+        border: 1px solid #e0e0e0;
+        border-left: 4px solid #0056b3;
+        margin-bottom: 12px;
+        font-size: 0.88em;
+        line-height: 1.5;
     }
-    /* 表格比例與換行控制 */
+    .warning-card {
+        background-color: #fff3cd;
+        padding: 10px;
+        border-radius: 6px;
+        border-left: 4px solid #ffc107;
+        margin-bottom: 12px;
+        font-size: 0.85em;
+    }
     table {
         width: 100% !important;
         border-collapse: collapse;
     }
-    th:nth-child(1), td:nth-child(1) {
-        width: 8% !important;
-        text-align: center !important;
-    }
-    th:nth-child(2), td:nth-child(2) {
-        width: 77% !important;
-    }
-    th:nth-child(3), td:nth-child(3) {
-        width: 15% !important;
-        text-align: center !important;
-        white-space: nowrap !important; /* 強制決議標籤不換行 */
-    }
+    th:nth-child(1), td:nth-child(1) { width: 8% !important; text-align: center !important; }
+    th:nth-child(2), td:nth-child(2) { width: 77% !important; }
+    th:nth-child(3), td:nth-child(3) { width: 15% !important; text-align: center !important; white-space: nowrap !important; }
     </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. 🛡️ 左側側邊欄：動態指引與標準格式說明
+# 2. 🛡️ 左側側邊欄：標準 PPT 格式與輸入指引
 # ==========================================
 with st.sidebar:
-    st.markdown("<div class='sidebar-title'>📖 智能對齊指引</div>", unsafe_allow_html=True)
+    st.markdown("<div class='sidebar-title'>📖 PPT 格式與輸入指引</div>", unsafe_allow_html=True)
+    
     st.markdown("""
-    本系統採用**「動態結構映射」**技術。AI 會自動閱讀您上傳的格式範本，提取其**編號與議題**作為骨架，再填入本次內容。
+    為了讓 AI 能 100% 精準擷取會議內容並生成完整紀錄，請確保上傳的 **PPT 頁面符合以下排版格式**：
     """)
     
-    st.markdown("<div class='guideline-card'><b>💡 指引一：格式範本文件</b><br>上傳一份標準格式或上次的會議記錄（.docx）。AI 會精確複製其「編號」與「題目題目」，確保跨會議的結構完全一致。</div>", unsafe_allow_html=True)
+    st.markdown("""
+    <div class='guideline-card'>
+    <b>📌 PPT 標準結構排版：</b><br>
+    • <b>頂部：</b>主議題 (對應範本大標題，如「三、培訓」)<br>
+    • <b>中間：</b>子題目 (對應項目編號，如「4. 培訓資助」)<br>
+    • <b>最下面：</b>詳細文字內容 (具體決議、名單或數據)
+    </div>
+    """, unsafe_allow_html=True)
     
-    st.markdown("<div class='guideline-card'><b>💡 指引二：內容對齊技巧</b><br>• <b>簡報檔 (PPTX)：</b> 簡報內的頁標題或內容，若能與範本的議題名稱「關鍵字對齊」，AI 的擷取精準度會最高。<br>• <b>圖片頁面補充：</b> 若 PPT 頁面包含圖片/截圖，可將重點文字貼在 PPT 下方的「備註欄 (Notes)」，AI 能自動讀取！<br>• <b>無簡報情境 (Draft Post)：</b> 若沒有 PPT，請直接在右側文字框，依照範本題目順序，簡單寫下紀錄或 Bullet Points 即可。</div>", unsafe_allow_html=True)
+    st.markdown("""
+    <div class='warning-card'>
+    ⚠️ <b>重要注意事項：</b><br>
+    1. <b>必須使用純文字框：</b> 最下方的詳細文字<b>嚴禁使用圖片或電郵截圖</b>！若是圖片，系統無法讀取文字，會議紀錄將<b>只會顯示子題目</b>。<br>
+    2. <b>無文字時補救：</b> 若 PPT 最下方未寫文字，請於右側「草稿 / 補充說明框」手動補上文字內容。
+    </div>
+    """, unsafe_allow_html=True)
 
     st.markdown("---")
-    st.caption("🔒 **ISO 數據安全聲明：** 記憶體即時運算，關閉網頁即時銷毀，絕不回傳 GitHub 儲存庫。")
+    st.caption("🔒 **ISO 數據安全聲明：** 本系統採 Session-Only 記憶體即時運算，關閉網頁數據即刻徹底銷毀。")
 
 # ==========================================
 # 3. 主畫面介面
@@ -72,7 +85,6 @@ with st.sidebar:
 st.title("📝 通用智能會議記錄生成器 (Smart Minutes Generator)")
 st.caption("基於動態模板映射與純本地端下載設計")
 
-# 從 Streamlit Secrets 讀取免費 AI API Token
 github_token = st.secrets.get("GITHUB_TOKEN", "")
 
 # ==========================================
@@ -96,21 +108,17 @@ def extract_text_from_pptx(file):
     content = []
     for idx, slide in enumerate(prs.slides, start=1):
         content.append(f"\n--- [ Slide {idx} ] ---")
-        
-        # 1. 讀取投影片文字方塊
         for shape in slide.shapes:
             if shape.has_text_frame:
                 for p in shape.text_frame.paragraphs:
                     if p.text.strip():
                         content.append(p.text.strip())
-            # 2. 讀取原生表格
             if shape.has_table:
                 for row in shape.table.rows:
                     row_data = [cell.text.strip().replace('\n', ' ') for cell in row.cells]
                     if any(row_data):
                         content.append(" | ".join(row_data))
                         
-        # 3. 讀取投影片備註欄 (Notes)，防止圖片/截圖頁面的補充文字遺漏
         if slide.has_notes_slide and slide.notes_slide.notes_text_frame:
             notes_text = slide.notes_slide.notes_text_frame.text.strip()
             if notes_text:
@@ -121,14 +129,12 @@ def extract_text_from_pptx(file):
 # ==========================================
 # 5. 使用者輸入區域
 # ==========================================
-# 步驟 1：定義骨架
 st.subheader("📁 1. 上傳會議記錄格式範本 / 上次紀錄")
 format_file = st.file_uploader("請上傳作為結構基準的 Word 檔案 (.docx)", type=["docx"])
 
 st.markdown("---")
 
-# 步驟 2：提供內容來源 (支援 PPT 或文字草稿)
-st.subheader("📊 2. 輸入本次會議內容來源 (可單選或組合使用)")
+st.subheader("📊 2. 輸入本次會議內容來源")
 col1, col2 = st.columns([1, 1])
 
 with col1:
@@ -136,9 +142,9 @@ with col1:
 
 with col2:
     current_draft_text = st.text_area(
-        "選擇 B：直接貼上本次會議草稿 / 簡短 Post 紀錄",
+        "選擇 B：補充說明 / 若 PPT 最下方無文字請在此輸入",
         height=160,
-        placeholder="若無 PPT，或 PPT 頁面包含圖片截圖，可在此直接打字補充重點。例如：\n1. 摘要：通過上次紀錄。\n2. 培訓：建議 $3,000 以下培訓資助由 HR 經理及營運總經理審批，免董事經理簽署。"
+        placeholder="若 PPT 頁面包含圖片/截圖，或最下方缺少詳細文字，請在此補上重點。例如：\n3.5 培訓資助：建議全數資助朱宗亮及李孝慈（Jason）報讀第二科《面對轉變》。"
     )
 
 # ==========================================
@@ -148,13 +154,12 @@ if st.button("🚀 即刻依範本結構生成會議記錄", type="primary", use
     if not format_file:
         st.error("🛑 請務必上傳「1. 格式範本 / 上次紀錄 (.docx)」以建立會議骨架！")
     elif not current_ppt_file and not current_draft_text.strip():
-        st.error("🛑 請提供本次會議內容，上傳 PPT 簡報或在草稿框輸入紀錄（二選一）。")
+        st.error("🛑 請提供本次會議內容，上傳 PPT 簡報或在右側文字框輸入紀錄。")
     elif not github_token:
         st.error("🛑 系統未偵測到 GITHUB_TOKEN Secrets，請檢查 Streamlit Cloud 後台設定。")
     else:
-        with st.spinner("⏳ 正在分析範本骨架並動態映射會議內容..."):
+        with st.spinner("⏳ 正在分析範本骨架並動態映射內容..."):
             try:
-                # 提取骨架與新內容
                 format_structure_text = extract_text_from_docx(format_file)
                 ppt_content_text = extract_text_from_pptx(current_ppt_file) if current_ppt_file else ""
 
@@ -209,7 +214,7 @@ if st.button("🚀 即刻依範本結構生成會議記錄", type="primary", use
                 st.error(f"❌ 生成失敗，請確認資料內容或 Token 設定: {str(e)}")
 
 # ==========================================
-# 7. 本地端純下載預覽 (ISO 零數據留存設計)
+# 7. 本地端純下載預覽
 # ==========================================
 if "generated_minutes" in st.session_state:
     st.markdown("---")
