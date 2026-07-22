@@ -42,14 +42,27 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. 🛡️ 左側側邊欄：標準 PPT 與草稿模式指引
+# 2. 🛡️ 左側側邊欄：標準下載、PPT 與草稿模式指引
 # ==========================================
 with st.sidebar:
-    st.markdown("<div class='sidebar-title'>📖 使用方式與格式指引</div>", unsafe_allow_html=True)
+    st.markdown("<div class='sidebar-title'>📥 下載基準範本</div>", unsafe_allow_html=True)
     
-    st.markdown("""
-    本系統支援兩種會議內容輸入模式（二選一）：
-    """)
+    # 自動從 GitHub 讀取並提供 meeting_template.docx 下載
+    try:
+        with open("meeting_template.docx", "rb") as f:
+            st.download_button(
+                label="📄 下載空白會議記錄格式範本 (.docx)",
+                data=f,
+                file_name="會議記錄標準格式範本.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                use_container_width=True
+            )
+    except FileNotFoundError:
+        st.info("💡 若需提供預設範本，請將 meeting_template.docx 上傳至 GitHub 根目錄。")
+
+    st.markdown("---")
+    st.markdown("<div class='sidebar-title'>📖 使用方式與格式指引</div>", unsafe_allow_html=True)
+    st.markdown("本系統支援兩種會議內容輸入模式（二選一）：")
     
     st.markdown("""
     <div class='guideline-card'>
@@ -118,7 +131,7 @@ def extract_text_from_pptx(file):
     return "\n".join(content)
 
 # ==========================================
-# 5. 使用者輸入區域 (通用商業/行政範例)
+# 5. 使用者輸入區域
 # ==========================================
 st.subheader("📁 1. 上傳會議記錄格式範本 / 上次紀錄")
 format_file = st.file_uploader("請上傳作為結構基準的 Word 檔案 (.docx)", type=["docx"])
