@@ -44,11 +44,25 @@ st.markdown("""
     th:nth-child(1), td:nth-child(1) { width: 8% !important; text-align: center !important; }
     th:nth-child(2), td:nth-child(2) { width: 77% !important; }
     th:nth-child(3), td:nth-child(3) { width: 15% !important; text-align: center !important; white-space: nowrap !important; }
+    
+    /* 低調 Footer 連結樣式 */
+    .footer-support {
+        font-size: 0.8em;
+        color: #718096;
+        margin-top: 15px;
+    }
+    .footer-support a {
+        color: #4a5568;
+        text-decoration: underline;
+    }
+    .footer-support a:hover {
+        color: #0056b3;
+    }
     </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. 🛡️ 左側側邊欄：支援 3 大商務範本下載
+# 2. 🛡️ 左側側邊欄：支援 3 大商務範本下載 & 低調聯絡資訊
 # ==========================================
 with st.sidebar:
     st.markdown("<div class='sidebar-title'>📥 下載基準範本 (.docx)</div>", unsafe_allow_html=True)
@@ -97,6 +111,13 @@ with st.sidebar:
 
     st.markdown("---")
     st.caption("🔒 **ISO 數據安全聲明：** 本系統採 Session-Only 記憶體即時運算，關閉網頁數據即刻徹底銷毀。")
+    
+    # 低調的技術支援 / 作者聯絡資訊
+    st.markdown("---")
+    st.markdown(
+        "<div class='footer-support'>💡 如有系統使用問題，歡迎聯絡 <a href='https://www.linkedin.com/in/jackylawck' target='_blank'>Jacky Law</a>。</div>", 
+        unsafe_allow_html=True
+    )
 
 # ==========================================
 # 3. 主畫面介面
