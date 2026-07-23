@@ -11,7 +11,7 @@ from pptx import Presentation
 from openai import OpenAI
 
 # ==========================================
-# 1. 頁面配置與美化 CSS (修復深色模式相容)
+# 1. 頁面配置與美化 CSS (完美支援深色/淺色模式)
 # ==========================================
 st.set_page_config(
     page_title="智能會議記錄生成器",
@@ -26,7 +26,7 @@ st.markdown("""
         font-size: 1.2em;
         margin-bottom: 10px;
     }
-    /* 卡片 CSS：相容深色與淺色模式 */
+    /* 指引卡片：採用半透明背景與動態文字，深淺色模式皆清晰 */
     .guideline-card {
         background-color: rgba(255, 255, 255, 0.08);
         color: inherit;
@@ -49,7 +49,7 @@ st.markdown("""
     th:nth-child(2), td:nth-child(2) { width: 77% !important; }
     th:nth-child(3), td:nth-child(3) { width: 15% !important; text-align: center !important; white-space: nowrap !important; }
     
-    /* 低調 Footer 連結樣式 */
+    /* 低調 Footer 聯絡資訊 */
     .footer-support {
         font-size: 0.8em;
         color: #a0aec0;
@@ -66,7 +66,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. 🛡️ 左側側邊欄：支援 3 大商務範本下載 & 低調聯絡資訊
+# 2. 🛡️ 左側側邊欄：支援 3 大商務範本下載 & 低調個人 Hub 連結
 # ==========================================
 with st.sidebar:
     st.markdown("<div class='sidebar-title'>📥 下載基準範本 (.docx)</div>", unsafe_allow_html=True)
@@ -116,10 +116,10 @@ with st.sidebar:
     st.markdown("---")
     st.caption("🔒 **ISO 數據安全聲明：** 本系統採 Session-Only 記憶體即時運算，關閉網頁數據即刻徹底銷毀。")
     
-    # 低調的技術支援 / 作者聯絡資訊
+    # 低調的個人 Hub 聯絡連結
     st.markdown("---")
     st.markdown(
-        "<div class='footer-support'>💡 如有系統使用問題，歡迎聯絡 <a href='https://www.linkedin.com/in/jackylawck' target='_blank'>Jacky Law</a>。</div>", 
+        "<div class='footer-support'>💡 如有系統使用問題，歡迎聯絡 <a href='https://jackylawck.github.io/jackylawck/' target='_blank'>Jacky Law</a>。</div>", 
         unsafe_allow_html=True
     )
 
