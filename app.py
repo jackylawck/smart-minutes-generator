@@ -11,7 +11,7 @@ from pptx import Presentation
 from openai import OpenAI
 
 # ==========================================
-# 1. 頁面配置與美化 CSS
+# 1. 頁面配置與美化 CSS (修復深色模式相容)
 # ==========================================
 st.set_page_config(
     page_title="智能會議記錄生成器",
@@ -22,20 +22,24 @@ st.set_page_config(
 st.markdown("""
     <style>
     .sidebar-title {
-        color: #1a365d;
         font-weight: bold;
         font-size: 1.2em;
         margin-bottom: 10px;
     }
+    /* 卡片 CSS：相容深色與淺色模式 */
     .guideline-card {
-        background-color: #ffffff;
+        background-color: rgba(255, 255, 255, 0.08);
+        color: inherit;
         padding: 12px;
         border-radius: 6px;
-        border: 1px solid #e0e0e0;
+        border: 1px solid rgba(128, 128, 128, 0.3);
         border-left: 4px solid #0056b3;
         margin-bottom: 12px;
         font-size: 0.88em;
         line-height: 1.5;
+    }
+    .guideline-card b {
+        color: #3182ce;
     }
     table {
         width: 100% !important;
@@ -48,15 +52,15 @@ st.markdown("""
     /* 低調 Footer 連結樣式 */
     .footer-support {
         font-size: 0.8em;
-        color: #718096;
+        color: #a0aec0;
         margin-top: 15px;
     }
     .footer-support a {
-        color: #4a5568;
+        color: #63b3ed;
         text-decoration: underline;
     }
     .footer-support a:hover {
-        color: #0056b3;
+        color: #90cdf4;
     }
     </style>
 """, unsafe_allow_html=True)
