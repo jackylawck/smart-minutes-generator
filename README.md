@@ -1,21 +1,21 @@
 # 📝 智能會議記錄生成器 (Smart Minutes Generator)
 
-基於 **Streamlit**、**GitHub Models (GPT-4o-mini)** 與 **動態範本映射技術 (Dynamic Template Mapping)** 開發的通用企業級會議記錄自動化工具。
+基於 **Streamlit**、**GitHub Models (GPT-4o-mini)** 與 **動態範本映射技術 (Dynamic Template Mapping)** 開發的通用企業級 AI 會議記錄自動化工具。
 
 🌐 **線上使用網址：** [https://smart-minutes-generator.streamlit.app](https://smart-minutes-generator.streamlit.app)
 
 ---
 
-## ✨ 核心特色與功能
+## ✨ 核心特色與商業價值
 
-* **📄 直接匯出高質感 Word (.docx)：** 支援一鍵導出具備深藍商務標頭、精確欄寬與防跨頁斷裂格式的標準 Word 文件，下載即用，符合真實企業辦公習慣。
-* **🏛️ 多元內建商務範本：** 內建 3 大常見企業會議格式（通用週會/例會、董事會/高層決議型、專案進度/檢討型），無需預先準備檔案即可即刻使用。
+* **📄 直接匯出高質感 Word (.docx)：** 支援一鍵導出具備深藍商務標頭、精確欄寬與防跨頁斷裂格式的標準 Word 文件，下載即用，完美符合真實企業辦公習慣。
+* **🏛️ 多元內建商務範本：** 內建 3 大常見企業會議格式（通用週會/例會、董事會/高層決議型、專案進度/檢討型），無須預先準備檔案即可即刻使用。
 * **📋 動態結構映射 (Dynamic Structure Mapping)：** 自動閱讀 Word 範本並提煉「編號與議題標題」作為骨架，將新會議內容精準對號入座。
 * **📊 雙模式內容輸入：**
   * **模式 A (PPT 簡報)：** 自動解析簡報標題、內文與備註欄 (Notes)。
   * **模式 B (文字草稿)：** 無 PPT 時，可直接於網頁輸入框按層級格式 (如 `1.1 ... 1.2 ...`) 貼上會議紀錄草稿。
 * **📥 側邊欄基準範本下載：** 內建 3 大商務 Word 範本檔，方便使用者隨時下載空白範本進行線下編輯。
-* **🛡️ ISO 級資訊安全與隱私保護：** 架構嚴格遵循 ISO/IEC 27001 與 ISO/IEC 27701 規範，採用純 Session 記憶體即時運算，實現零資料留存 (Zero Data Retention)。
+* **🛡️ 零數據留存資安架構 (Zero Data Retention)：** 採用純 Session 記憶體即時運算，關閉網頁後數據即刻徹底銷毀，完全符合企業商業機密保護要求。
 
 ---
 
@@ -45,12 +45,33 @@
 
 ---
 
+## 🚀 企業級功能演進藍圖 (Enterprise Roadmap)
+
+為了進一步深化 ISO 27001/27701 合規實踐與企業級營運體驗，本專案規劃以下三個階段的迭代計畫：
+
+* **Phase 1: 資安與數據主權強化 (Security & Data Sovereignty)**
+  * [ ] **PII 本地動態遮蔽 (Local PII Redaction):** 於送出 API 前進行本地端 HKID、電話、薪資等敏感個資正則遮蔽，實現「傳輸前假名化 (Pseudonymization)」。
+  * [ ] **自備 API Key (BYOK - Bring Your Own Key):** 提供企業自選 OpenAI / Azure OpenAI 私有端點，讓資料流精確符合企業內部的 Azure VPC 安全規範。
+* **Phase 2: 產品體驗與範本忠實度升級 (User Experience & Fidelity)**
+  * [ ] **原檔範本忠實留存 (Preserve Original Template):** 導入「模板克隆 + 結構注入」模式，直接回填文字至用戶上傳的 Word 檔，100% 完整保留企業 Logo、頁首頁尾與專屬色系。
+  * [ ] **區塊化對話微調 (Section-based Chat Refinement):** 允許使用者點選單一章節（如 3.1 條文）進行局部 AI 對話修訂，節省 Token 消耗並實現即時完稿。
+* **Phase 3: 治理與稽核軌跡 (AI Governance & Audit Trail)**
+  * [ ] **結構化稽核日誌 (Compliance Audit Trail):** 記憶體內產生 Session-Only 的操作與 PII 遮蔽摘要日誌，支援導出供企業資安稽核員 (CISO/Auditor) 備查。
+
+---
+
 ## 🛠️ 技術架構 (Tech Stack)
 
 * **前端與 UI：** Streamlit
 * **大語言模型 API：** GitHub Models / Azure OpenAI (`gpt-4o-mini`)
 * **文件解析與轉換：** `python-docx` (Word 解析與高質感 Word 生成) + `python-pptx` (PPT 簡報解析)
 * **樣式優化：** Custom CSS + OpenXML Table Styling (控制 Word 表格欄寬、背景色與對齊)
+
+---
+
+## 💡 技術支援與聯絡方式 (Support)
+
+本專案由 [Jacky Law](https://jackylawck.github.io/jackylawck/) 開發與維護。如有任何系統建置、商業部署或 AI 治理諮詢問題，歡迎透過連結聯繫。
 
 ---
 
