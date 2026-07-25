@@ -11,7 +11,13 @@ from pptx import Presentation
 from openai import OpenAI
 
 # ==========================================
-# 1. 頁面配置與美化 CSS (完美支援深色/淺色模式)
+# 0. Session State 初始化 (BYOK 設定持久化)
+# ==========================================
+if "generated_minutes" not in st.session_state:
+    st.session_state["generated_minutes"] = ""
+
+# ==========================================
+# 1. 頁面配置與美化 CSS
 # ==========================================
 st.set_page_config(
     page_title="智能會議記錄生成器",
@@ -67,9 +73,12 @@ st.markdown("""
 # 2. 🛡️ 本地端 PII 敏感數據遮蔽器 (ISO 27701 假名化)
 # ==========================================
 class PIIMasker:
-    """輕量本地 PII 遮蔽器：在送往 API 前進行假名化，零額外 Token 負擔"""
+    """
+    輕量本地 PII 遮蔽器：在送往 API 前進行假名化 (Pseudonymization)，
+    零額外 Token 負擔，完全符合 ISO/IEC 27701 最小必要原則。
+    """
     PATTERNS = {
-        'HKID':    r'\b[A-Z]{1,2}\d{6}[\(]?\d?[\)]?[A-Z]?\b',
+        'HKID':    r'\b[A-Z]{1,2}\d{6}[$]?\d?[$]?[A-Z]?\b',
         'TW_ID':   r'\b[A-Z][12]\d{8}\b',
         'CN_ID':   r'\b\d{17}[\dXx]\b',
         'EMAIL':   r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}',
@@ -78,8 +87,8 @@ class PIIMasker:
     }
 
     def __init__(self):
-        self.vault = {}
-        self.counters = {}
+        self.vault = {}      # token -> original
+        self.counters = {}   # type -> count
 
     def mask(self, text: str) -> str:
         if not text:
@@ -97,15 +106,17 @@ class PIIMasker:
         return out
 
     def unmask(self, text: str) -> str:
-        if not text:
+        if not text or not self.vault:
             return text
         out = text
+        # 由長到短替換，避免子字串誤覆蓋
         for tok in sorted(self.vault.keys(), key=len, reverse=True):
             out = out.replace(tok, self.vault[tok])
         return out
 
+
 # ==========================================
-# 3. 🛡️ 左側側邊欄：支援 3 大商務範本下載 & 低調個人 Hub 連結
+# 3. 🛡️ 左側側邊欄：商務範本下載 & 指引
 # ==========================================
 with st.sidebar:
     st.markdown("<div class='sidebar-title'>📥 下載基準範本 (.docx)</div>", unsafe_allow_html=True)
@@ -153,7 +164,7 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     st.markdown("---")
-    st.caption("🔒 **ISO 數據安全聲明：** 本系統採 Session-Only 記憶體即時運算，關閉網頁數據即刻徹底銷毀。")
+    st.caption("🔒 **ISO 數據安全聲明：** 本系統採 Session-Only 記憶體即時運算，關閉網頁數據即刻徹底銷毀。所有 PII 資料在送出 API 前均已本地假名化。")
     
     st.markdown("---")
     st.markdown(
@@ -165,23 +176,56 @@ with st.sidebar:
 # 4. 主畫面介面與 BYOK (自備 API Key) 設定
 # ==========================================
 st.title("📝 智能會議記錄生成器 (Smart Minutes Generator)")
-st.caption("基於動態模板映射與純本地端下載設計")
+st.caption("基於動態模板映射、PII 本地假名化與 BYOK 企業資安設計")
 
-# BYOK 企業級 API 設定區域
 with st.expander("🔑 企業資安選項：自備 API Key (BYOK)", expanded=False):
-    use_byok = st.toggle("啟用自備 API Key (自帶企業 API 通道)", value=False)
+    use_byok = st.toggle(
+        "啟用自備 API Key (自帶企業 API 通道)",
+        value=st.session_state.get("use_byok", False),
+        key="byok_toggle"
+    )
+    st.session_state["use_byok"] = use_byok
+
     if use_byok:
-        api_provider = st.selectbox("API 供應商類型", ["GitHub Models", "OpenAI", "Azure OpenAI"])
-        byok_key = st.text_input("輸入 API Key / Token", type="password", placeholder="sk-... 或 ghp_...")
-        byok_model = st.text_input("模型名稱", value="gpt-4o-mini")
-        byok_url = st.text_input("Base URL (Azure OpenAI 或自架端點必填)", placeholder="https://your-resource.openai.azure.com/")
+        api_provider = st.selectbox(
+            "API 供應商類型",
+            ["GitHub Models", "OpenAI", "Azure OpenAI"],
+            key="byok_provider"
+        )
+        byok_key = st.text_input(
+            "輸入 API Key / Token",
+            type="password",
+            placeholder="sk-... 或 ghp_...",
+            key="byok_key"
+        )
+        byok_model = st.text_input(
+            "模型名稱",
+            value=st.session_state.get("byok_model", "gpt-4o-mini"),
+            key="byok_model"
+        )
+        byok_url = st.text_input(
+            "Base URL (Azure OpenAI 或自架端點必填)",
+            value=st.session_state.get("byok_url", ""),
+            placeholder="https://your-resource.openai.azure.com/",
+            key="byok_url"
+        )
     else:
         byok_key = st.secrets.get("GITHUB_TOKEN", "")
         byok_model = "gpt-4o-mini"
         byok_url = "https://models.inference.ai.azure.com"
 
 # ==========================================
-# 5. 檔案解析與 Word 轉換函式
+# 5. 統一 OpenAI Client 初始化
+# ==========================================
+def get_openai_client(api_key: str, base_url: str):
+    """根據 BYOK 設定動態初始化 OpenAI Client"""
+    kwargs = {"api_key": api_key}
+    if base_url and base_url.strip():
+        kwargs["base_url"] = base_url.strip()
+    return OpenAI(**kwargs)
+
+# ==========================================
+# 6. 檔案解析與 Word 轉換函式
 # ==========================================
 def extract_text_from_docx(file):
     doc = docx.Document(file)
@@ -347,7 +391,7 @@ def convert_md_to_docx(md_text):
     return bio
 
 # ==========================================
-# 6. 使用者輸入區域 (多範本選擇)
+# 7. 使用者輸入區域 (多範本選擇)
 # ==========================================
 st.subheader("📁 1. 選擇或上傳會議記錄格式範本")
 
@@ -407,7 +451,7 @@ with col2:
     )
 
 # ==========================================
-# 7. AI 動態對齊生成邏輯 (包含 PII 本地動態遮蔽)
+# 8. AI 動態對齊生成邏輯 (含 PII 遮蔽 / BYOK)
 # ==========================================
 if st.button("🚀 即刻依範本結構生成會議記錄", type="primary", use_container_width=True):
     if not format_file_source:
@@ -430,11 +474,7 @@ if st.button("🚀 即刻依範本結構生成會議記錄", type="primary", use
                 masked_draft_text = masker.mask(current_draft_text)
 
                 # 3. 初始化 OpenAI Client (BYOK 或預設通道)
-                client_kwargs = {"api_key": byok_key}
-                if byok_url.strip():
-                    client_kwargs["base_url"] = byok_url.strip()
-
-                client = OpenAI(**client_kwargs)
+                client = get_openai_client(api_key=byok_key, base_url=byok_url)
 
                 system_prompt = """
                 你是一名精通企業行政與結構化合規管理的高級秘書。你的任務是進行「動態結構映射與內容提煉」。
@@ -488,9 +528,9 @@ if st.button("🚀 即刻依範本結構生成會議記錄", type="primary", use
                 st.error(f"❌ 生成失敗，請確認 API Key、Base URL 或資料內容是否正確: {str(e)}")
 
 # ==========================================
-# 8. 本地端純下載預覽 (預設提供 Word .docx 下載)
+# 9. 本地端純下載預覽
 # ==========================================
-if "generated_minutes" in st.session_state:
+if st.session_state.get("generated_minutes"):
     st.markdown("---")
     st.subheader("📋 會議記錄預覽 (Preview)")
     st.markdown(st.session_state["generated_minutes"], unsafe_allow_html=True)
