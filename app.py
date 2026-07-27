@@ -16,6 +16,10 @@ from openai import OpenAI
 if "generated_minutes" not in st.session_state:
     st.session_state["generated_minutes"] = ""
 
+# 防止免費 API 被濫用的計數器 (限制每個 Session 最多生成 10 次)
+if "generation_count" not in st.session_state:
+    st.session_state["generation_count"] = 0
+
 # ==========================================
 # 1. 頁面配置與美化 CSS (支援深色/淺色模式)
 # ==========================================
@@ -229,7 +233,6 @@ def extract_text_from_pptx(file):
                 content.append(f"[備註/補充說明]: {notes_text}")
     return "\n".join(content)
 
-# [新增] 複製儲存格格式 (Phase 2)
 def copy_cell_formatting(src_cell, dst_cell):
     """精細複製儲存格的對齊與字體樣式"""
     if not src_cell.paragraphs:
@@ -248,7 +251,6 @@ def copy_cell_formatting(src_cell, dst_cell):
             if src_run.font.color and src_run.font.color.rgb:
                 dst_run.font.color.rgb = src_run.font.color.rgb
 
-# [新增] 將 AI Markdown 填入用戶原檔 (Phase 2)
 def fill_user_template(template_file, md_text: str) -> io.BytesIO:
     """保留用戶原檔 Logo、頁首尾，僅將資料注入表格"""
     template_file.seek(0)
@@ -304,7 +306,6 @@ def fill_user_template(template_file, md_text: str) -> io.BytesIO:
     buf.seek(0)
     return buf
 
-# [保留] 系統內建高質感渲染 (Fallback / 內建範本使用)
 def convert_md_to_docx(md_text):
     doc = Document()
     for section in doc.sections:
@@ -485,9 +486,10 @@ with col2:
     )
 
 # ==========================================
-# 7. AI 生成邏輯
+# 7. AI 生成邏輯 (含 PII 遮蔽 / BYOK / 限額 10 次與安全 Exception)
 # ==========================================
 if st.button("🚀 即刻依範本結構生成會議記錄", type="primary", use_container_width=True):
+    # --- 1. 基本表單驗證 ---
     if not format_file_source:
         st.error("🛑 請務必選擇有效的內建範本或上傳自訂 Word 範本以建立會議骨架！")
     elif not current_ppt_file and not current_draft_text.strip():
@@ -495,6 +497,13 @@ if st.button("🚀 即刻依範本結構生成會議記錄", type="primary", use
     elif not byok_key:
         st.error("🛑 未檢測到有效的 API Key。請確認 Secrets 已設定 GITHUB_TOKEN，或開啟「自備 API Key」輸入密鑰。")
     else:
+        # --- 2. Rate Limiting 防濫用機制 (使用免費系統 Key 的用戶，每個 Session 限額 10 次) ---
+        if not use_byok:
+            if st.session_state["generation_count"] >= 10:
+                st.error("🛑 系統免費體驗額度已達上限（每位訪客限 10 次）。為確保資源公平使用，請開啟上方「企業資安選項」，輸入您專屬的 API Key 繼續使用。")
+                st.stop() # 強制終止執行
+
+        # --- 3. 開始處理與生成 ---
         with st.spinner("⏳ 正在進行 PII 本地遮蔽並分析範本歸納會議記錄..."):
             try:
                 # 抽取文字
@@ -557,11 +566,16 @@ if st.button("🚀 即刻依範本結構生成會議記錄", type="primary", use
                 raw_md = response.choices[0].message.content
                 final_minutes_md = masker.unmask(raw_md)
 
+                # 生成成功後，若使用系統免費 Key 則累加計數
+                if not use_byok:
+                    st.session_state["generation_count"] += 1
+
                 st.session_state["generated_minutes"] = final_minutes_md
-                st.success("✨ 本次會議記錄已成功生成 (完成本地 PII 去識別化與架構對齊)！")
+                st.success(f"✨ 本次會議記錄已成功生成 (完成本地 PII 去識別化與架構對齊)！(免費用量：{st.session_state['generation_count']}/10)")
 
             except Exception as e:
-                st.error(f"❌ 生成失敗，請確認 API Key、Base URL 或資料內容是否正確: {str(e)}")
+                # [安全升級] 攔截詳細報錯，防止 Header/API Key 外洩
+                st.error(f"❌ 生成失敗。為保護資安，系統已攔截詳細錯誤資訊 (Error Type: {type(e).__name__})。請確認 API Key、Base URL 或資料內容是否正確。")
 
 # ==========================================
 # 8. 預覽與下載 (平滑回退邏輯)
@@ -572,9 +586,7 @@ if st.session_state.get("generated_minutes"):
     st.markdown(st.session_state["generated_minutes"], unsafe_allow_html=True)
     st.markdown("---")
     
-    # 決定匯出 Word 檔的處理方式
     try:
-        # 如果用戶有上傳自訂範本，啟動 Phase 2 範本留存功能
         if hasattr(format_file_source, 'read'):
             word_buf = fill_user_template(format_file_source, st.session_state["generated_minutes"])
             download_label = "📄 下載標準 Word 記錄 (保留自訂範本 Logo 與格式)"
@@ -582,7 +594,6 @@ if st.session_state.get("generated_minutes"):
             word_buf = convert_md_to_docx(st.session_state["generated_minutes"])
             download_label = "📄 下載標準 Word 記錄 (內建商務格式)"
     except Exception as e:
-        # 解析失敗平滑回退
         st.warning(f"⚠️ 自訂範本特殊格式套用失敗 ({e})，已自動切換至系統標準排版。")
         word_buf = convert_md_to_docx(st.session_state["generated_minutes"])
         download_label = "📄 下載標準 Word 記錄 (系統安全回退格式)"
@@ -608,4 +619,3 @@ if st.session_state.get("generated_minutes"):
             mime="text/markdown",
             use_container_width=True
         )
-
