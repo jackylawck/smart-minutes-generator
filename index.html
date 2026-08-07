@@ -62,20 +62,26 @@
         <div class="max-w-3xl">
             <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-400 text-xs font-semibold mb-6">
                 <span class="flex h-2 w-2 rounded-full bg-blue-400 animate-pulse"></span>
-                Enterprise AI Automation & Governance
+                Enterprise AI Automation & Governance | 企業級 AI 自動化與治理
             </div>
             <h1 class="text-4xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight mb-6">
                 智能會議記錄生成器<br>
                 <span class="text-blue-400 text-3xl sm:text-4xl">Smart Minutes Generator</span>
             </h1>
-            <p class="text-lg text-slate-300 leading-relaxed mb-8">
-                通用型 AI 智能會議記錄生成器 — 基於動態範本映射技術，支援多種商務 Word (.docx) 匯出、本地端 PII 假名化與 Zero Data Retention 隱私安全設計 (Streamlit + GPT-4o)。
-            </p>
+            
+            <div class="space-y-3 text-slate-300 leading-relaxed mb-8">
+                <p class="text-base sm:text-lg">
+                    通用型 AI 智能會議記錄生成器 — 基於動態範本映射技術，支援多種商務 Word (.docx) 匯出、本地端 PII 假名化與 Zero Data Retention 隱私安全設計 (Streamlit + GPT-4o)。
+                </p>
+                <p class="text-sm sm:text-base text-slate-400 italic">
+                    Universal enterprise AI meeting minutes automation based on Dynamic Template Mapping. Features professional Word (.docx) export, local PII redaction, BYOK, and Zero Data Retention (ZDR) architecture.
+                </p>
+            </div>
             
             <!-- 行動按鈕 -->
             <div class="flex flex-wrap gap-4 justify-center sm:justify-start">
                 <a href="https://smart-minutes-generator.streamlit.app" target="_blank" rel="noopener" class="px-8 py-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold transition-all shadow-lg shadow-blue-600/30 flex items-center gap-2">
-                    🚀 即刻體驗 Web App (Launch App)
+                    🚀 即刻體驗 Web App / Launch App
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                 </a>
                 <a href="https://github.com/jackylawck/smart-minutes-generator" target="_blank" rel="noopener" class="px-6 py-4 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 font-medium transition-all">
@@ -103,20 +109,32 @@
     <section id="features" class="py-16 px-6 max-w-6xl mx-auto">
         <h2 class="text-xs uppercase tracking-widest text-slate-400 font-semibold mb-8">Key Capabilities / 核心特色</h2>
         <div class="grid md:grid-cols-3 gap-6">
+            <!-- Card 1 -->
             <div class="p-6 rounded-2xl border border-slate-800 bg-slate-900/40 space-y-3">
                 <div class="text-3xl">📄</div>
-                <h3 class="text-lg font-bold text-white">高質感 Word (.docx) 匯出</h3>
-                <p class="text-sm text-slate-400 leading-relaxed">內建深藍商務標頭、精確欄寬與 OpenXML 防跨頁斷裂格式，下載即可直接提交高層與董事會。</p>
+                <h3 class="text-lg font-bold text-white">高質感 Word (.docx) 匯出<br><span class="text-xs text-blue-400 font-normal">Professional Word (.docx) Export</span></h3>
+                <p class="text-sm text-slate-400 leading-relaxed">
+                    內建深藍商務標頭、精確欄寬與 OpenXML 防跨頁斷裂格式，下載即可直接提交高層與董事會。<br>
+                    <span class="text-xs text-slate-500 block mt-1">Built-in corporate headers, column width alignment, and OpenXML row-splitting prevention for board-ready documents.</span>
+                </p>
             </div>
+            <!-- Card 2 -->
             <div class="p-6 rounded-2xl border border-slate-800 bg-slate-900/40 space-y-3">
                 <div class="text-3xl">🎯</div>
-                <h3 class="text-lg font-bold text-white">動態範本結構映射</h3>
-                <p class="text-sm text-slate-400 leading-relaxed">支援內建 3 大商務範本 (週會、董事會、專案檢討) 或上傳企業專屬 Word 範本，自動保持原本 Logo 與議題骨架。</p>
+                <h3 class="text-lg font-bold text-white">動態範本結構映射<br><span class="text-xs text-blue-400 font-normal">Dynamic Template Mapping</span></h3>
+                <p class="text-sm text-slate-400 leading-relaxed">
+                    支援內建 3 大商務範本 (週會、董事會、專案檢討) 或上傳企業專屬 Word 範本，自動保持原本 Logo 與議題骨架。<br>
+                    <span class="text-xs text-slate-500 block mt-1">Supports built-in templates (Weekly, Board, Project) or custom uploaded Word templates while preserving original logos and layouts.</span>
+                </p>
             </div>
+            <!-- Card 3 -->
             <div class="p-6 rounded-2xl border border-slate-800 bg-slate-900/40 space-y-3">
                 <div class="text-3xl">🔑</div>
-                <h3 class="text-lg font-bold text-white">BYOK 企業通道與安全防護</h3>
-                <p class="text-sm text-slate-400 leading-relaxed">支援輸入企業專屬 API Key，內建 Session Rate Limiting 與安全 Exception 攔截，嚴防 API Key 與敏感資料外洩。</p>
+                <h3 class="text-lg font-bold text-white">BYOK 企業通道與安全防護<br><span class="text-xs text-blue-400 font-normal">BYOK & Security Hardening</span></h3>
+                <p class="text-sm text-slate-400 leading-relaxed">
+                    支援輸入企業專屬 API Key，內建 Session Rate Limiting 與安全 Exception 攔截，嚴防 API Key 與敏感資料外洩。<br>
+                    <span class="text-xs text-slate-500 block mt-1">Supports Bring Your Own Key (BYOK) with session rate limiting and secure exception handling to prevent API key leaks.</span>
+                </p>
             </div>
         </div>
     </section>
@@ -125,19 +143,21 @@
     <section id="security" class="py-16 px-6 max-w-6xl mx-auto border-t border-slate-900">
         <div class="rounded-3xl border border-blue-900/40 bg-gradient-to-b from-blue-950/20 to-slate-900/40 p-8 sm:p-12">
             <h2 class="text-2xl font-bold text-white mb-6 flex items-center gap-3">
-                <span>🛡️</span> ISO 資安與隱私合規設計 (Privacy-by-Design)
+                <span>🛡️</span> ISO 資安與隱私合規設計 <span class="text-sm font-normal text-slate-400">(Privacy-by-Design & Compliance)</span>
             </h2>
             <div class="grid md:grid-cols-2 gap-8 text-sm text-slate-300">
                 <div class="space-y-2">
-                    <h4 class="font-semibold text-blue-400 text-base">🔒 ISO/IEC 27001 零數據留存 (ZDR)</h4>
+                    <h4 class="font-semibold text-blue-400 text-base">🔒 ISO/IEC 27001 零數據留存 (Zero Data Retention / ZDR)</h4>
                     <p class="leading-relaxed text-slate-400">
-                        採用純 Session-Only 記憶體運算架構。上傳之簡報與生成紀錄絕不儲存於任何伺服器硬碟或資料庫，瀏覽器一經關閉或重新整理，所有記憶體資料即刻徹底銷毀。
+                        採用純 Session-Only 記憶體運算架構。上傳之簡報與生成紀錄絕不儲存於任何伺服器硬碟或資料庫，瀏覽器一經關閉或重新整理，所有記憶體資料即刻徹底銷毀。<br>
+                        <span class="text-xs text-slate-500 block mt-1">Session-only in-memory architecture. Files and generated text are never persisted to disk or databases and are instantly destroyed when the browser session ends.</span>
                     </p>
                 </div>
                 <div class="space-y-2">
-                    <h4 class="font-semibold text-blue-400 text-base">🔒 ISO/IEC 27701 本地 PII 假名化</h4>
+                    <h4 class="font-semibold text-blue-400 text-base">🔒 ISO/IEC 27701 本地 PII 假名化 (Local PII Redaction)</h4>
                     <p class="leading-relaxed text-slate-400">
-                        於資料送出 API 前，本地 Python 端 (`PIIMasker`) 先將香港身份證 (HKID)、電話、薪資金額等敏感個資進行假名化遮蔽，收回回應後再於本地端還原，防止第三方 LLM 接觸真實敏感資料。
+                        於資料送出 API 前，本地 Python 端 (`PIIMasker`) 先將香港身份證 (HKID)、電話、薪資金額等敏感個資進行假名化遮蔽，收回回應後再於本地端還原，防止第三方 LLM 接觸真實敏感資料。<br>
+                        <span class="text-xs text-slate-500 block mt-1">Pre-flight local anonymization for HKID, phone numbers, and salary details before sending to LLMs, ensuring compliance with privacy standards.</span>
                     </p>
                 </div>
             </div>
