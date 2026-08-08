@@ -45,6 +45,18 @@
 
 ---
 
+## 🛡️ ISO 資訊安全與隱私合規聲明 (ISO Security & Privacy Compliance)
+
+本專案完全遵循 ISO 42001 (AIMS)、ISO 27001 與歐盟 AI 法案之要求，歸檔以下完整審計文件：
+
+| 合規文件 (Compliance Doc) | 說明 (Description) | 稽核對齊標準 |
+| :--- | :--- | :--- |
+| 📇 **[MODEL_CARD.md](MODEL_CARD.md)** | 核心模型資訊卡、超參數與 Prompt 雙語調校軌跡 | ISO 42001 A.6.2 & A.8.2 |
+| 🛡️ **[docs/RISK_ASSESSMENT.md](docs/RISK_ASSESSMENT.md)** | AI 幻覺、API 外洩與流量資安風險矩陣 | ISO 42001 A.5 & EU AI Act Art 9 |
+| 🔒 **[docs/DATA_GOVERNANCE.md](docs/DATA_GOVERNANCE.md)** | ZDR 零數據留存與 PII 本地端動態假名化 | ISO 27001 & ISO 27701 PIMS |
+| 👤 **[docs/HUMAN_OVERSIGHT.md](docs/HUMAN_OVERSIGHT.md)** | 人工審核 (HITL)、平滑回退與流量控管機制 | EU AI Act Article 14 |
+| 🔄 **[docs/LIFECYCLE_MANAGEMENT.md](docs/LIFECYCLE_MANAGEMENT.md)** | 模型升級、Prompt 變更控制與版本履歷 | ISO 42001 Control A.6 |
+
 ## 🚀 企業級功能演進藍圖 (Enterprise Roadmap)
 
 * **Phase 1: 資安與數據主權強化 (Security & Data Sovereignty)**
