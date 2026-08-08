@@ -18,7 +18,7 @@
 
 即時銷毀 (Instant Destruction): 網頁關閉、重新整理或 Session 過期時，記憶體自動觸發垃圾回收 (Garbage Collection) 銷毀所有數據。
 
-2. 🛡️ 本地端 PII 假名化規範 (Pre-flight Pseudonymization)
+## 2. 🛡️ 本地端 PII 假名化規範 (Pre-flight Pseudonymization)
 在任何數據離開伺服器送往公有雲端 API 之前，本地 Python 端 PIIMasker 會強制進行敏感個資遮蔽：
 
 香港身份證 (HKID): 遮蔽為 [REDACTED_HKID_N]
@@ -29,7 +29,7 @@
 
 薪資金額 (Salary): 遮蔽為 [REDACTED_SALARY_N]
 
-3. 🚫 無模型再訓練條款 (No AI Model Training Clause)
+## 3. 🚫 無模型再訓練條款 (No AI Model Training Clause)
 本系統所選用之企業級 API 通道（GitHub Models / Azure OpenAI Service）明確包含 No Model Training 協議。
 
 所有過境數據嚴禁被供應商用於改善或再訓練底層大語言模型。
