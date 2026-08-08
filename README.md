@@ -47,15 +47,16 @@
 
 ## 🚀 企業級功能演進藍圖 (Enterprise Roadmap)
 
-為了進一步深化 ISO 27001/27701 合規實踐與企業級營運體驗，本專案規劃以下三個階段的迭代計畫：
-
 * **Phase 1: 資安與數據主權強化 (Security & Data Sovereignty)**
-  * [ ] **PII 本地動態遮蔽 (Local PII Redaction):** 於送出 API 前進行本地端 HKID、電話、薪資等敏感個資正則遮蔽，實現「傳輸前假名化 (Pseudonymization)」。
-  * [ ] **自備 API Key (BYOK - Bring Your Own Key):** 提供企業自選 OpenAI / Azure OpenAI 私有端點，讓資料流精確符合企業內部的 Azure VPC 安全規範。
+  * [x] **PII 本地動態遮蔽 (Local PII Redaction):** 於送出 API 前進行本地端 HKID、電話、Email、薪資等敏感個資正則遮蔽，實現「傳輸前假名化 (Pseudonymization)」。
+  * [x] **自備 API Key (BYOK - Bring Your Own Key):** 提供企業自選 OpenAI / Azure OpenAI / GitHub Models 私有端點。
+  * [x] **API Key 防洩漏與流量控管:** 攔截詳細 Exception 報錯防 Header 外洩，並加入免費通道 Session 10 次配額限制。
 * **Phase 2: 產品體驗與範本忠實度升級 (User Experience & Fidelity)**
-  * [ ] **原檔範本忠實留存 (Preserve Original Template):** 導入「模板克隆 + 結構注入」模式，直接回填文字至用戶上傳的 Word 檔，100% 完整保留企業 Logo、頁首頁尾與專屬色系。
-  * [ ] **區塊化對話微調 (Section-based Chat Refinement):** 允許使用者點選單一章節（如 3.1 條文）進行局部 AI 對話修訂，節省 Token 消耗並實現即時完稿。
+  * [x] **原檔範本忠實留存 (`fill_user_template`):** 導入「模板克隆 + 結構注入」模式，直接回填文字至用戶上傳的 Word 檔，100% 完整保留企業 Logo、頁首頁尾與專屬樣式。
+  * [x] **多語言雙語支援 (Bilingual i18n):** 支援「繁體中文 / English」介面與 LLM System Prompt 動態雙語切換。
+  * [ ] **區塊化對話微調 (Section-based Chat Refinement):** 允許使用者點選單一章節進行局部 AI 對話修訂。
 * **Phase 3: 治理與稽核軌跡 (AI Governance & Audit Trail)**
+  * [x] **ISO 42001 Model Card 歸檔:** 完成 [MODEL_CARD.md](MODEL_CARD.md) 審計文件規範。
   * [ ] **結構化稽核日誌 (Compliance Audit Trail):** 記憶體內產生 Session-Only 的操作與 PII 遮蔽摘要日誌，支援導出供企業資安稽核員 (CISO/Auditor) 備查。
 
 ---
