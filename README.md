@@ -27,9 +27,16 @@
   * **零數據留存 (Zero Data Retention / ZDR)：** 系統採用 Session-Only 記憶體運算架構。使用者上傳之 `.docx` 範本、`.pptx` 簡報及生成之會議記錄**絕不儲存於任何伺服器硬碟、資料庫或第三方儲存庫**。
   * **即時銷毀 (Instant Destruction)：** 當使用者關閉或重新整理瀏覽器分頁，所有運算記憶體與對話 Session 即刻被徹底銷毀。
 * **🔒 ISO/IEC 27701 (隱私資訊管理體系 - PIMS) 對齊：**
-  * **數據最小化 (Data Minimization)：** 系統僅在記憶體中提煉必要的議題結構與會議文字進行對齊，不進行任何無關數據的分析或留存。
+  * **數據最小化與 PII 本地假名化：** 資料送出 API 前，本地 Python 端 (`PIIMasker`) 自動遮蔽 HKID、電話、Email 與薪資金額，收回回應後再於本地還原。
   * **無模型訓練 (No AI Model Training)：** 透過企業級 API 進行運算，傳輸數據嚴禁用於任何大語言模型 (LLM) 的再訓練。
 * **🌐 傳輸安全 (TLS/SSL Encryption)：** 全程採用 HTTPS / TLS 1.3 國際標準加密傳輸，確保資料在傳送過程免受攔截。
+
+### 📋 完整 ISO 42001 & EU AI Act 審計文件庫 (Audit Documentation)
+* 📇 **[MODEL_CARD.md](MODEL_CARD.md)** — 核心模型規格與雙語 Prompt 調校軌跡
+* 🛡️ **[docs/RISK_ASSESSMENT.md](docs/RISK_ASSESSMENT.md)** — AI 幻覺、API 外洩與流量資安風險矩陣
+* 🔒 **[docs/DATA_GOVERNANCE.md](docs/DATA_GOVERNANCE.md)** — ZDR 零留存與 PII 本地端動態假名化政策
+* 👤 **[docs/HUMAN_OVERSIGHT.md](docs/HUMAN_OVERSIGHT.md)** — 人工審核 (HITL)、平滑回退與流量控管機制
+* 🔄 **[docs/LIFECYCLE_MANAGEMENT.md](docs/LIFECYCLE_MANAGEMENT.md)** — 模型升級、Prompt 變更控制與版本履歷
 
 ---
 
