@@ -48,7 +48,7 @@ I18N = {
         "byok_provider": "API 供應商類型",
         "byok_key": "輸入 API Key / Token",
         "byok_model": "模型名稱",
-        "byok_url": "Base URL (Azure OpenAI 或自架端點必填)",
+        "byok_url": "Base URL (OpenAI 留空；GitHub/Azure 填完整端點)",
         "sec_template": "📁 1. 選擇或上傳會議記錄格式範本",
         "template_src": "請選擇會議記錄結構來源：",
         "template_builtin": "內建標準範本 (免上傳)",
@@ -93,7 +93,7 @@ I18N = {
         "byok_provider": "API Provider Type",
         "byok_key": "Enter API Key / Token",
         "byok_model": "Model Name",
-        "byok_url": "Base URL (Required for Azure OpenAI or Private Endpoints)",
+        "byok_url": "Base URL (Leave blank for OpenAI; Provide endpoint for GitHub/Azure)",
         "sec_template": "📁 1. Select or Upload Meeting Minutes Template",
         "template_src": "Select template source:",
         "template_builtin": "Built-in Standard Template",
@@ -225,7 +225,7 @@ with st.sidebar:
     st.markdown("<div class='footer-support'>💡 Developer: <a href='https://jackylawck.github.io/jackylawck/' target='_blank'>Jacky Law</a></div>", unsafe_allow_html=True)
 
 # ==========================================
-# 4. 主畫面介面與 BYOK 設定
+# 4. 主畫面介面與 BYOK 設定 (修復 404 路由)
 # ==========================================
 st.title(t["title"])
 st.caption(t["caption"])
@@ -237,17 +237,19 @@ with st.expander(t["byok_title"], expanded=False):
     if use_byok:
         api_provider = st.selectbox(t["byok_provider"], ["GitHub Models", "OpenAI", "Azure OpenAI"], key="byok_provider")
         byok_key = st.text_input(t["byok_key"], type="password", placeholder="sk-... / ghp_...", key="byok_key")
-        byok_model = st.text_input(t["byok_model"], value=st.session_state.get("byok_model", "gpt-4o-mini"), key="byok_model")
-        byok_url = st.text_input(t["byok_url"], value=st.session_state.get("byok_url", ""), placeholder="https://your-resource.openai.azure.com/", key="byok_url")
+        
+        default_model = "gpt-4o-mini"
+        byok_model = st.text_input(t["byok_model"], value=st.session_state.get("byok_model", default_model), key="byok_model")
+        byok_url = st.text_input(t["byok_url"], value=st.session_state.get("byok_url", ""), placeholder="https://models.inference.ai.azure.com", key="byok_url")
     else:
         byok_key = st.secrets.get("GITHUB_TOKEN", "")
         byok_model = "gpt-4o-mini"
         byok_url = "https://models.inference.ai.azure.com"
 
 def get_openai_client(api_key: str, base_url: str):
-    kwargs = {"api_key": api_key}
+    kwargs = {"api_key": api_key.strip()}
     if base_url and base_url.strip():
-        kwargs["base_url"] = base_url.strip()
+        kwargs["base_url"] = base_url.strip().rstrip("/")
     return OpenAI(**kwargs)
 
 # ==========================================
@@ -530,14 +532,35 @@ if st.button(t["btn_generate"], type="primary", use_container_width=True):
                 Draft Text: {masked_draft}
                 """
 
-                response = client.chat.completions.create(
-                    messages=[
-                        {"role": "system", "content": t["system_prompt"]},
-                        {"role": "user", "content": user_prompt}
-                    ],
-                    model=byok_model,
-                    temperature=0.2,
-                )
+                # 嘗試請求模型，若遇到模型名稱映射問題自動回退
+                candidate_models = [byok_model]
+                if not use_byok:
+                    if byok_model == "gpt-4o-mini":
+                        candidate_models.append("openai/gpt-4o-mini")
+                    elif byok_model == "openai/gpt-4o-mini":
+                        candidate_models.append("gpt-4o-mini")
+
+                response = None
+                last_err = None
+
+                for target_model in candidate_models:
+                    try:
+                        response = client.chat.completions.create(
+                            messages=[
+                                {"role": "system", "content": t["system_prompt"]},
+                                {"role": "user", "content": user_prompt}
+                            ],
+                            model=target_model,
+                            temperature=0.2,
+                        )
+                        if response:
+                            break
+                    except Exception as err:
+                        last_err = err
+                        continue
+
+                if not response and last_err:
+                    raise last_err
 
                 raw_md = response.choices[0].message.content
                 final_minutes_md = masker.unmask(raw_md)
