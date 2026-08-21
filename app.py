@@ -45,7 +45,7 @@ with st.sidebar:
 I18N = {
     "繁體中文": {
         "title": "📝 智能會議記錄生成器 (Smart Minutes Generator)",
-        "caption": "金融防禦級架構：JSON 結構化保證、Magic Bytes 檔案校驗、PII 深度假名化與 ISO 42001 審計日誌",
+        "caption": "金融防禦級架構：容錯 JSON/Markdown 解析、Magic Bytes 檔案校驗、PII 深度假名化與 ISO 42001 審計日誌",
         "sidebar_template_download": "📥 下載基準範本 (.docx)",
         "sidebar_guidelines": "📖 使用方式與格式指引",
         "sidebar_guide_a": "<b>📊 模式 A：上傳 PPT 簡報</b><br>• 排版建議：頁面頂部為大議題，中間為子題目。<br>• 顯示邏輯：自動填入範本結構。",
@@ -56,7 +56,7 @@ I18N = {
         "byok_provider": "API 供應商類型",
         "byok_key": "輸入 API Key / Token",
         "byok_model": "模型名稱",
-        "byok_url": "Base URL (OpenAI 留空；GitHub/Azure 填完整端點)",
+        "byok_url": "Base URL (OpenAI 留空；GitHub 留空即可走預設)",
         "sec_template": "📁 1. 選擇或上傳會議記錄格式範本",
         "template_src": "請選擇會議記錄結構來源：",
         "template_builtin": "內建標準範本 (免上傳)",
@@ -69,7 +69,7 @@ I18N = {
         "mode_b": "選擇 B：貼上會議草稿 (無 PPT 時使用)",
         "placeholder_b": "若無 PPT，請依照議題與編號輸入草稿內容，例如：\n1. 會議摘要\n1.1 通過上次會議紀錄。\n1.2 確認季度營運目標達成率為 95%。",
         "btn_generate": "🚀 即刻依範本結構生成會議記錄",
-        "btn_processing": "⏳ 正在進行深度去識別化與 JSON 結構化生成...",
+        "btn_processing": "⏳ 正在進行深度去識別化與結構化生成...",
         "preview_title": "📋 會議記錄預覽 (Preview)",
         "btn_download_docx_custom": "📄 下載標準 Word 記錄 (保留自訂範本 Logo 與格式)",
         "btn_download_docx_builtin": "📄 下載標準 Word 記錄 (內建商務格式)",
@@ -81,37 +81,32 @@ I18N = {
         "err_no_key": "🛑 未檢測到有效的 API Key。請確認 Secrets 已設定 GITHUB_TOKEN，或開啟 BYOK 輸入密鑰。",
         "err_rate_limit": "🛑 免費額度已達上限（每位訪客限 10 次）。請開啟上方 BYOK 輸入專屬 API Key。",
         "err_file_security": "🛑 檔案安全校驗失敗：檔案非合法 OpenXML 格式或已損毀。",
-        "msg_success": "✨ 本次會議記錄已成功生成 (完成本地 PII 去識別化與 JSON 結構化對齊)！",
+        "msg_success": "✨ 本次會議記錄已成功生成 (完成本地 PII 去識別化與結構化對齊)！",
         "msg_fallback": "⚠️ 自訂範本特殊格式套用失敗，已自動平滑回退至標準排版。",
         "system_prompt": """你是一名精通企業行政與結構化合規管理的高級秘書。你的任務是進行「動態結構映射與內容提煉」。
-請務必嚴格輸出符合以下 JSON Schema 的純 JSON 物件，嚴禁包含額外 Markdown 語法或說明字串：
+請優先輸出符合以下 JSON 格式的內容：
 {
   "title": "會議記錄標題",
   "meta_info": {
-    "date": "會議日期 (如有，否則空字串)",
-    "location": "會議地點 (如有，否則空字串)",
-    "chairperson": "主席 (如有，否則空字串)",
-    "secretary": "記錄員 (如有，否則空字串)"
+    "date": "",
+    "location": "",
+    "chairperson": "",
+    "secretary": ""
   },
   "agenda_items": [
     {
       "id": "1.1",
-      "topic": "議題內容或子項目討論事項摘要",
+      "topic": "議題內容摘要",
       "resolution": "（通過）/（記錄）/（跟進）"
     }
   ]
 }
-
-【規範與約束】：
-1. 深度分析【格式範本/上次紀錄】，完全提取其內部使用的「編號」、「議題標題」。
-2. 對比【本次會議內容】，歸納填入對應議題下。若某議題未提及，topic 填寫「本次會議暫無相關事項。」。
-3. 文中若包含 [REDACTED_...] 脫敏標籤，請完全原樣留存，切勿刪除。
-4. resolution 欄位必須嚴格為以下三者之一：「（通過）」、「（記錄）」、「（跟進）」。
-5. 語言：繁體中文（專業企業語彙）。"""
+若無法輸出 JSON，請輸出標準 Markdown 表格：`| 編號 | 議題 | 決議 |`。
+文中包含的 [REDACTED_...] 標籤必須完全原樣留存。語言：繁體中文。"""
     },
     "English": {
         "title": "📝 Smart Minutes Generator",
-        "caption": "Enterprise Defense Architecture: JSON Structured Enforcement, Magic Bytes Validation, Deep PII Masking & ISO 42001 Audit Logging",
+        "caption": "Enterprise Defense Architecture: Resilient JSON/Markdown Parsing, Magic Bytes Validation, Deep PII Masking & ISO 42001 Audit Logging",
         "sidebar_template_download": "📥 Download Baseline Templates (.docx)",
         "sidebar_guidelines": "📖 User Guide & Format Rules",
         "sidebar_guide_a": "<b>📊 Mode A: Upload PPT Presentation</b><br>• Layout: Agenda topics at top, detailed bullet points below.<br>• Logic: Automatically maps content into template structure.",
@@ -122,7 +117,7 @@ I18N = {
         "byok_provider": "API Provider Type",
         "byok_key": "Enter API Key / Token",
         "byok_model": "Model Name",
-        "byok_url": "Base URL (Leave blank for OpenAI; Provide endpoint for GitHub/Azure)",
+        "byok_url": "Base URL (Leave blank for OpenAI/GitHub default)",
         "sec_template": "📁 1. Select or Upload Meeting Minutes Template",
         "template_src": "Select template source:",
         "template_builtin": "Built-in Standard Template",
@@ -135,7 +130,7 @@ I18N = {
         "mode_b": "Option B: Paste Meeting Draft Text",
         "placeholder_b": "Paste draft text using agenda hierarchy, e.g.:\n1. Executive Summary\n1.1 Approved previous meeting minutes.\n1.2 Confirmed Q2 target achievement rate at 95%.",
         "btn_generate": "🚀 Generate Meeting Minutes Now",
-        "btn_processing": "⏳ Processing PII redaction and JSON structured synthesis...",
+        "btn_processing": "⏳ Processing PII redaction and structured synthesis...",
         "preview_title": "📋 Meeting Minutes Preview",
         "btn_download_docx_custom": "📄 Download Word (.docx) - Preserving Custom Template Logo/Style",
         "btn_download_docx_builtin": "📄 Download Word (.docx) - Standard Corporate Style",
@@ -147,33 +142,28 @@ I18N = {
         "err_no_key": "🛑 No valid API Key detected. Please configure secrets or enable BYOK mode.",
         "err_rate_limit": "🛑 Free trial usage limit reached (10 generations per session). Please enable BYOK mode.",
         "err_file_security": "🛑 File validation failed: The uploaded file is not a valid OpenXML document.",
-        "msg_success": "✨ Meeting minutes successfully generated (with local PII redaction and JSON structure mapping)!",
+        "msg_success": "✨ Meeting minutes successfully generated (with local PII redaction and structure mapping)!",
         "msg_fallback": "⚠️ Custom template filling failed. Automatically falling back to standard format.",
         "system_prompt": """You are an executive assistant specializing in corporate governance. Your task is "Dynamic Structure Mapping and Summarization".
-You MUST strictly respond with a valid JSON object conforming to this schema without any surrounding markdown commentary:
+Please prioritize responding with a valid JSON format:
 {
   "title": "Meeting Minutes Title",
   "meta_info": {
-    "date": "Date if mentioned, else empty string",
-    "location": "Location if mentioned, else empty string",
-    "chairperson": "Chairperson if mentioned, else empty string",
-    "secretary": "Secretary if mentioned, else empty string"
+    "date": "",
+    "location": "",
+    "chairperson": "",
+    "secretary": ""
   },
   "agenda_items": [
     {
       "id": "1.1",
-      "topic": "Discussion topic summary or sub-item description",
+      "topic": "Topic summary",
       "resolution": "(Approved) / (Noted) / (Action Required)"
     }
   ]
 }
-
-【Rules & Constraints】:
-1. Deeply analyze [Format Template] to extract all item numbers and topic headings.
-2. Summarize [Meeting Content] and map items under corresponding headings. If unmentioned, write "No relevant items discussed during this meeting."
-3. If [REDACTED_...] tokens exist, PRESERVE THEM EXACTLY without alteration.
-4. The resolution property must be strictly one of: "(Approved)", "(Noted)", "(Action Required)".
-5. Language: Professional Corporate English."""
+If unable to produce JSON, output a standard Markdown Table: `| Item No. | Topic / Discussion | Decision / Action |`.
+Preserve [REDACTED_...] tokens exactly. Language: Professional Corporate English."""
     }
 }
 
@@ -295,11 +285,11 @@ with st.expander(t["byok_title"], expanded=False):
         byok_key = st.text_input(t["byok_key"], type="password", placeholder="sk-... / ghp_...", key="byok_key")
         default_model = "gpt-4o-mini"
         byok_model = st.text_input(t["byok_model"], value=st.session_state.get("byok_model", default_model), key="byok_model")
-        byok_url = st.text_input(t["byok_url"], value=st.session_state.get("byok_url", ""), placeholder="https://models.inference.ai.azure.com", key="byok_url")
+        byok_url = st.text_input(t["byok_url"], value=st.session_state.get("byok_url", ""), placeholder="OpenAI 留空；GitHub 留空即可", key="byok_url")
     else:
         byok_key = st.secrets.get("GITHUB_TOKEN", "")
         byok_model = "gpt-4o-mini"
-        byok_url = "https://models.inference.ai.azure.com"
+        byok_url = ""
 
 def get_openai_client(api_key: str, base_url: str):
     kwargs = {"api_key": api_key.strip()}
@@ -308,15 +298,58 @@ def get_openai_client(api_key: str, base_url: str):
     return OpenAI(**kwargs)
 
 # ==========================================
-# 6. JSON 與 Markdown 雙向轉換引擎
+# 6. 強健解析引擎 (JSON + Markdown Dual Parser)
 # ==========================================
+def parse_llm_output_to_data(raw_text: str):
+    clean_text = raw_text.strip()
+    if clean_text.startswith("```"):
+        clean_text = re.sub(r"^```(?:json|markdown)?\n?", "", clean_text)
+        clean_text = re.sub(r"\n?```$", "", clean_text).strip()
+
+    try:
+        data = json.loads(clean_text)
+        if isinstance(data, dict) and "agenda_items" in data:
+            return data
+    except Exception:
+        pass
+
+    # 若非 JSON，以 Markdown 解析
+    lines = clean_text.splitlines()
+    title = "會議記錄 / Meeting Minutes"
+    agenda_items = []
+    in_table = False
+
+    for line in lines:
+        l = line.strip()
+        if l.startswith("# "):
+            title = l.replace("# ", "").strip()
+        elif l.startswith("|") and l.endswith("|"):
+            in_table = True
+            if re.match(r'^\|[\s\:\-\|]+\|$', l):
+                continue
+            cells = [c.strip().replace(r'\|', '|') for c in re.split(r'(?<!\\)\|', l[1:-1])]
+            if len(cells) >= 3:
+                # 排除標頭列
+                if cells[0] in ["編號", "Item", "Item No.", "序号"]:
+                    continue
+                agenda_items.append({
+                    "id": cells[0],
+                    "topic": " - ".join(cells[1:-1]) if len(cells) > 3 else cells[1],
+                    "resolution": cells[-1]
+                })
+
+    return {
+        "title": title,
+        "meta_info": {},
+        "agenda_items": agenda_items
+    }
+
 def json_to_markdown(minutes_data: dict) -> str:
-    """將結構化 JSON 轉為視覺化 Markdown"""
     title = minutes_data.get("title", "會議記錄 / Meeting Minutes")
     md = [f"# {title}\n"]
     
     meta = minutes_data.get("meta_info", {})
-    if any(meta.values()):
+    if isinstance(meta, dict) and any(meta.values()):
         for k, v in meta.items():
             if v:
                 md.append(f"**{k.capitalize()}**: {v}")
@@ -338,7 +371,7 @@ def json_to_markdown(minutes_data: dict) -> str:
     return "\n".join(md)
 
 # ==========================================
-# 7. Word 解析與渲染模組 (Direct JSON-to-OpenXML)
+# 7. Word 解析與渲染模組
 # ==========================================
 def extract_text_from_docx(file):
     if hasattr(file, 'seek'):
@@ -560,7 +593,7 @@ with col2:
     current_draft_text = st.text_area(t["mode_b"], height=180, placeholder=t["placeholder_b"])
 
 # ==========================================
-# 9. AI 生成邏輯 (JSON Mode + Multi-Model Resilience)
+# 9. AI 生成邏輯 (雙端點自動降級容錯)
 # ==========================================
 generate_btn = st.button(
     t["btn_generate"] if not st.session_state["is_processing"] else t["btn_processing"],
@@ -591,8 +624,6 @@ if generate_btn:
                     masked_ppt = masker.mask(ppt_content_text)
                     masked_draft = masker.mask(current_draft_text)
 
-                    client = get_openai_client(api_key=byok_key, base_url=byok_url)
-
                     user_prompt = f"""
                     Format Baseline (Extract Topic Hierarchy & IDs from here):
                     {masked_format}
@@ -602,31 +633,34 @@ if generate_btn:
                     Draft Text: {masked_draft}
                     """
 
-                    # Multi-Model Fallback 彈性降級矩陣
-                    candidate_models = [byok_model]
-                    if not use_byok:
-                        if byok_model == "gpt-4o-mini":
-                            candidate_models = ["openai/gpt-4o-mini", "gpt-4o-mini", "gpt-4o"]
-                        elif byok_model == "openai/gpt-4o-mini":
-                            candidate_models = ["openai/gpt-4o-mini", "gpt-4o-mini", "gpt-4o"]
+                    # 端點與模型調度矩陣 (自動嘗試官方與 Azure 代理路徑)
+                    call_matrix = []
+                    if use_byok:
+                        call_matrix.append((byok_url, byok_model))
+                    else:
+                        call_matrix = [
+                            ("[https://models.inference.ai.azure.com](https://models.inference.ai.azure.com)", "gpt-4o-mini"),
+                            ("[https://models.inference.ai.azure.com](https://models.inference.ai.azure.com)", "openai/gpt-4o-mini"),
+                            ("[https://models.github.ai/inference](https://models.github.ai/inference)", "gpt-4o-mini"),
+                        ]
 
                     response = None
                     last_err = None
                     successful_model = None
 
-                    for target_model in candidate_models:
+                    for ep_url, ep_model in call_matrix:
                         try:
+                            client = get_openai_client(api_key=byok_key, base_url=ep_url)
                             response = client.chat.completions.create(
                                 messages=[
                                     {"role": "system", "content": t["system_prompt"]},
                                     {"role": "user", "content": user_prompt}
                                 ],
-                                model=target_model,
-                                temperature=0.2,
-                                response_format={"type": "json_object"}
+                                model=ep_model,
+                                temperature=0.2
                             )
                             if response:
-                                successful_model = target_model
+                                successful_model = f"{ep_model} @ {ep_url}"
                                 break
                         except Exception as err:
                             last_err = err
@@ -635,11 +669,11 @@ if generate_btn:
                     if not response and last_err:
                         raise last_err
 
-                    raw_json_str = response.choices[0].message.content
-                    raw_dict = json.loads(raw_json_str)
+                    raw_output = response.choices[0].message.content
+                    parsed_dict = parse_llm_output_to_data(raw_output)
 
-                    # 於本地 Python 端安全還原脫敏個資
-                    final_minutes_dict = masker.unmask_json(raw_dict)
+                    # 本地安全還原個資
+                    final_minutes_dict = masker.unmask_json(parsed_dict)
                     final_minutes_md = json_to_markdown(final_minutes_dict)
 
                     if not use_byok:
@@ -648,7 +682,6 @@ if generate_btn:
                     st.session_state["generated_minutes_json"] = final_minutes_dict
                     st.session_state["generated_minutes_md"] = final_minutes_md
                     
-                    # 寫入 Session 審計日誌
                     st.session_state["audit_log"].append({
                         "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
                         "model_used": successful_model,
