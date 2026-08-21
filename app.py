@@ -282,7 +282,7 @@ with st.expander(t["byok_title"], expanded=False):
 
     if use_byok:
         api_provider = st.selectbox(t["byok_provider"], ["GitHub Models", "OpenAI", "Azure OpenAI"], key="byok_provider")
-        byok_key = st.text_input(t["byok_key"], type="password", placeholder="sk-... / ghp_...", key="byok_key")
+        byok_key = st.text_input(t["byok_key"], type="password", placeholder="sk-... / github_pat_...", key="byok_key")
         default_model = "gpt-4o-mini"
         byok_model = st.text_input(t["byok_model"], value=st.session_state.get("byok_model", default_model), key="byok_model")
         byok_url = st.text_input(t["byok_url"], value=st.session_state.get("byok_url", "https://models.inference.ai.azure.com"), key="byok_url")
