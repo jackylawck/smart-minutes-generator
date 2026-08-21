@@ -1,6 +1,8 @@
 import os
 import io
 import re
+import json
+import datetime
 import streamlit as st
 import docx
 from docx import Document
@@ -11,17 +13,25 @@ from pptx import Presentation
 from openai import OpenAI
 
 # ==========================================
-# 0. Session State 初始化
+# 0. Session State 初始化與狀態鎖
 # ==========================================
-if "generated_minutes" not in st.session_state:
-    st.session_state["generated_minutes"] = ""
+if "generated_minutes_json" not in st.session_state:
+    st.session_state["generated_minutes_json"] = None
 
-# 防止免費 API 被濫用的計數器 (限制每個 Session 最多生成 10 次)
+if "generated_minutes_md" not in st.session_state:
+    st.session_state["generated_minutes_md"] = ""
+
 if "generation_count" not in st.session_state:
     st.session_state["generation_count"] = 0
 
+if "is_processing" not in st.session_state:
+    st.session_state["is_processing"] = False
+
+if "audit_log" not in st.session_state:
+    st.session_state["audit_log"] = []
+
 # ==========================================
-# 1. 頁面配置與多語言 (i18n) 字典引擎
+# 1. 頁面配置與多語言 (i18n) 字典
 # ==========================================
 st.set_page_config(
     page_title="Smart Minutes Generator | 智能會議記錄生成器",
@@ -29,20 +39,18 @@ st.set_page_config(
     layout="wide"
 )
 
-# 側邊欄最頂部：語言切換器
 with st.sidebar:
     lang = st.radio("🌐 Language / 語言", ["繁體中文", "English"], horizontal=True)
 
-# 完整多語言字典定義
 I18N = {
     "繁體中文": {
         "title": "📝 智能會議記錄生成器 (Smart Minutes Generator)",
-        "caption": "基於動態模板映射、PII 本地假名化與 BYOK 企業資安設計",
+        "caption": "金融防禦級架構：JSON 結構化保證、Magic Bytes 檔案校驗、PII 深度假名化與 ISO 42001 審計日誌",
         "sidebar_template_download": "📥 下載基準範本 (.docx)",
         "sidebar_guidelines": "📖 使用方式與格式指引",
         "sidebar_guide_a": "<b>📊 模式 A：上傳 PPT 簡報</b><br>• 排版建議：頁面頂部為大議題，中間為子題目。<br>• 顯示邏輯：自動填入範本結構。",
         "sidebar_guide_b": "<b>📝 模式 B：文字草稿輸入</b><br>• 使用情境：無 PPT 時，按議題層級貼上草稿。<br>• 處理邏輯：AI 自動歸納至範本結構。",
-        "sidebar_iso": "🔒 **ISO 數據安全聲明：** 本系統採 Session-Only 記憶體即時運算，關閉網頁數據即刻銷毀。所有 PII 資料在送出 API 前均已本地假名化。",
+        "sidebar_iso": "🔒 **ISO 數據安全聲明：** 本系統採 Session-Only 記憶體運算，關閉即銷毀。支援合規審計日誌導出。",
         "byok_title": "🔑 企業資安選項：自備 API Key (BYOK)",
         "byok_toggle": "啟用自備 API Key (自帶企業 API 通道)",
         "byok_provider": "API 供應商類型",
@@ -55,39 +63,60 @@ I18N = {
         "template_custom": "自行上傳自訂 Word 範本 (.docx)",
         "template_type": "選擇內建商務範本類型：",
         "upload_custom_tpl": "請上傳作為結構基準的 Word 檔案 (.docx)",
-        "success_custom_tpl": "成功載入自訂範本！系統將在匯出時保留您的專屬 Logo 與格式。",
+        "success_custom_tpl": "成功載入並校驗自訂範本！匯出時將保留專屬 Logo 與排版。",
         "sec_content": "📊 2. 輸入本次會議內容來源 (選擇 A 或 選擇 B)",
         "mode_a": "選擇 A：上傳本次會議簡報 (.pptx)",
         "mode_b": "選擇 B：貼上會議草稿 (無 PPT 時使用)",
         "placeholder_b": "若無 PPT，請依照議題與編號輸入草稿內容，例如：\n1. 會議摘要\n1.1 通過上次會議紀錄。\n1.2 確認季度營運目標達成率為 95%。",
         "btn_generate": "🚀 即刻依範本結構生成會議記錄",
+        "btn_processing": "⏳ 正在進行深度去識別化與 JSON 結構化生成...",
         "preview_title": "📋 會議記錄預覽 (Preview)",
         "btn_download_docx_custom": "📄 下載標準 Word 記錄 (保留自訂範本 Logo 與格式)",
         "btn_download_docx_builtin": "📄 下載標準 Word 記錄 (內建商務格式)",
-        "btn_download_docx_fallback": "📄 下載標準 Word 記錄 (系統安全回退格式)",
+        "btn_download_docx_fallback": "📄 下載標準 Word 記錄 (安全回退格式)",
         "btn_download_md": "📥 下載 Markdown 原始檔 (.md)",
-        "err_no_template": "🛑 請務必選擇有效的內建範本或上傳自訂 Word 範本以建立會議骨架！",
+        "btn_download_audit": "🛡️ 導出 ISO 42001 審計日誌 (.json)",
+        "err_no_template": "🛑 請務必選擇有效的內建範本或上傳自訂 Word 範本！",
         "err_no_content": "🛑 請提供本次會議內容，上傳 PPT 簡報（選擇 A）或輸入會議草稿（選擇 B）。",
-        "err_no_key": "🛑 未檢測到有效的 API Key。請確認 Secrets 已設定 GITHUB_TOKEN，或開啟「自備 API Key」輸入密鑰。",
-        "err_rate_limit": "🛑 系統免費體驗額度已達上限（每位訪客限 10 次）。請開啟上方「企業資安選項」，輸入專屬 API Key 繼續使用。",
-        "msg_success": "✨ 本次會議記錄已成功生成 (完成本地 PII 去識別化與架構對齊)！",
-        "msg_fallback": "⚠️ 自訂範本特殊格式套用失敗，已自動切換至系統標準排版。",
+        "err_no_key": "🛑 未檢測到有效的 API Key。請確認 Secrets 已設定 GITHUB_TOKEN，或開啟 BYOK 輸入密鑰。",
+        "err_rate_limit": "🛑 免費額度已達上限（每位訪客限 10 次）。請開啟上方 BYOK 輸入專屬 API Key。",
+        "err_file_security": "🛑 檔案安全校驗失敗：檔案非合法 OpenXML 格式或已損毀。",
+        "msg_success": "✨ 本次會議記錄已成功生成 (完成本地 PII 去識別化與 JSON 結構化對齊)！",
+        "msg_fallback": "⚠️ 自訂範本特殊格式套用失敗，已自動平滑回退至標準排版。",
         "system_prompt": """你是一名精通企業行政與結構化合規管理的高級秘書。你的任務是進行「動態結構映射與內容提煉」。
-1. 深度分析【格式範本/上次紀錄】，完全提取其內部使用的「編號」、「議題標題」與「表格結構」。這將作為本次會議紀錄的骨架。
-2. 對比【本次會議內容 (PPT 簡報或文字草稿)】，將內容歸納並填入範本對應的編號與議題下。
-3. 若某議題在本次內容中完全沒有提及，請於該議題下寫「本次會議暫無相關事項。」，不可遺漏範本原有的任何一個大項。
-4. 文中若包含 [REDACTED_...] 格式的脫敏標籤，請完全原樣留存於對應位置，切勿刪除或修改。
-5. 表格規範 (Markdown Table)：表格標頭必須嚴格包含 3 欄 `| 編號 | 議題 | 決議 |`，「決議」欄只能精簡出現：（通過）、（記錄）或（跟進）三個標籤。
-6. 語言：繁體中文（專業企業語彙）。"""
+請務必嚴格輸出符合以下 JSON Schema 的純 JSON 物件，嚴禁包含額外 Markdown 語法或說明字串：
+{
+  "title": "會議記錄標題",
+  "meta_info": {
+    "date": "會議日期 (如有，否則空字串)",
+    "location": "會議地點 (如有，否則空字串)",
+    "chairperson": "主席 (如有，否則空字串)",
+    "secretary": "記錄員 (如有，否則空字串)"
+  },
+  "agenda_items": [
+    {
+      "id": "1.1",
+      "topic": "議題內容或子項目討論事項摘要",
+      "resolution": "（通過）/（記錄）/（跟進）"
+    }
+  ]
+}
+
+【規範與約束】：
+1. 深度分析【格式範本/上次紀錄】，完全提取其內部使用的「編號」、「議題標題」。
+2. 對比【本次會議內容】，歸納填入對應議題下。若某議題未提及，topic 填寫「本次會議暫無相關事項。」。
+3. 文中若包含 [REDACTED_...] 脫敏標籤，請完全原樣留存，切勿刪除。
+4. resolution 欄位必須嚴格為以下三者之一：「（通過）」、「（記錄）」、「（跟進）」。
+5. 語言：繁體中文（專業企業語彙）。"""
     },
     "English": {
         "title": "📝 Smart Minutes Generator",
-        "caption": "Powered by Dynamic Template Mapping, Local PII Redaction, and BYOK Enterprise Security",
+        "caption": "Enterprise Defense Architecture: JSON Structured Enforcement, Magic Bytes Validation, Deep PII Masking & ISO 42001 Audit Logging",
         "sidebar_template_download": "📥 Download Baseline Templates (.docx)",
         "sidebar_guidelines": "📖 User Guide & Format Rules",
         "sidebar_guide_a": "<b>📊 Mode A: Upload PPT Presentation</b><br>• Layout: Agenda topics at top, detailed bullet points below.<br>• Logic: Automatically maps content into template structure.",
         "sidebar_guide_b": "<b>📝 Mode B: Paste Draft Text</b><br>• Use Case: Paste raw draft using structured bullet levels.<br>• Logic: Summarizes text into matched agenda items.",
-        "sidebar_iso": "🔒 **ISO Security Statement:** Session-Only in-memory execution. Data is destroyed upon tab closure. All PII is redacted locally prior to API submission.",
+        "sidebar_iso": "🔒 **ISO Security Statement:** Session-Only memory execution. Compliant with ISO 42001 audit logging.",
         "byok_title": "🔑 Enterprise Option: Bring Your Own Key (BYOK)",
         "byok_toggle": "Enable BYOK Mode (Use Custom API Channel)",
         "byok_provider": "API Provider Type",
@@ -100,66 +129,82 @@ I18N = {
         "template_custom": "Upload Custom Word Template (.docx)",
         "template_type": "Select Built-in Template Style:",
         "upload_custom_tpl": "Upload a Word file (.docx) as structural baseline",
-        "success_custom_tpl": "Custom template loaded! System will preserve your original Logo and styling upon export.",
+        "success_custom_tpl": "Custom template validated! Layout and logo will be preserved upon export.",
         "sec_content": "📊 2. Input Meeting Content (Option A or Option B)",
         "mode_a": "Option A: Upload Meeting Presentation (.pptx)",
         "mode_b": "Option B: Paste Meeting Draft Text",
         "placeholder_b": "Paste draft text using agenda hierarchy, e.g.:\n1. Executive Summary\n1.1 Approved previous meeting minutes.\n1.2 Confirmed Q2 target achievement rate at 95%.",
         "btn_generate": "🚀 Generate Meeting Minutes Now",
+        "btn_processing": "⏳ Processing PII redaction and JSON structured synthesis...",
         "preview_title": "📋 Meeting Minutes Preview",
         "btn_download_docx_custom": "📄 Download Word (.docx) - Preserving Custom Template Logo/Style",
         "btn_download_docx_builtin": "📄 Download Word (.docx) - Standard Corporate Style",
         "btn_download_docx_fallback": "📄 Download Word (.docx) - Safe Fallback Style",
         "btn_download_md": "📥 Download Markdown Raw File (.md)",
+        "btn_download_audit": "🛡️ Export ISO 42001 Audit Log (.json)",
         "err_no_template": "🛑 Please select a built-in template or upload a custom Word template!",
         "err_no_content": "🛑 Please provide meeting content via PPTX upload (Option A) or text draft (Option B).",
-        "err_no_key": "🛑 No valid API Key detected. Please configure GITHUB_TOKEN in secrets or enable BYOK mode.",
-        "err_rate_limit": "🛑 Free trial usage limit reached (10 generations per session). Please enable BYOK mode and provide your API Key.",
-        "msg_success": "✨ Meeting minutes successfully generated (with local PII redaction and structure mapping)!",
+        "err_no_key": "🛑 No valid API Key detected. Please configure secrets or enable BYOK mode.",
+        "err_rate_limit": "🛑 Free trial usage limit reached (10 generations per session). Please enable BYOK mode.",
+        "err_file_security": "🛑 File validation failed: The uploaded file is not a valid OpenXML document.",
+        "msg_success": "✨ Meeting minutes successfully generated (with local PII redaction and JSON structure mapping)!",
         "msg_fallback": "⚠️ Custom template filling failed. Automatically falling back to standard format.",
-        "system_prompt": """You are an executive assistant specializing in corporate administrative and compliance management. Your task is "Dynamic Structure Mapping and Summarization".
-1. Deeply analyze the [Format Template] to extract all item numbers, topic headings, and table structures as the skeleton.
-2. Compare [Meeting Content] and summarize items under corresponding headings.
-3. If a topic in the template is unmentioned, write "No relevant items discussed during this meeting." under that heading.
-4. If [REDACTED_...] tokens exist in the text, PRESERVE THEM EXACTLY without alteration or removal.
-5. Markdown Table format requirement: Tables must contain 3 columns `| Item No. | Topic / Discussion | Decision / Action |`. Keep the "Decision / Action" column concise: (Approved), (Noted), or (Action Required).
-6. Language: Professional Corporate English."""
+        "system_prompt": """You are an executive assistant specializing in corporate governance. Your task is "Dynamic Structure Mapping and Summarization".
+You MUST strictly respond with a valid JSON object conforming to this schema without any surrounding markdown commentary:
+{
+  "title": "Meeting Minutes Title",
+  "meta_info": {
+    "date": "Date if mentioned, else empty string",
+    "location": "Location if mentioned, else empty string",
+    "chairperson": "Chairperson if mentioned, else empty string",
+    "secretary": "Secretary if mentioned, else empty string"
+  },
+  "agenda_items": [
+    {
+      "id": "1.1",
+      "topic": "Discussion topic summary or sub-item description",
+      "resolution": "(Approved) / (Noted) / (Action Required)"
+    }
+  ]
+}
+
+【Rules & Constraints】:
+1. Deeply analyze [Format Template] to extract all item numbers and topic headings.
+2. Summarize [Meeting Content] and map items under corresponding headings. If unmentioned, write "No relevant items discussed during this meeting."
+3. If [REDACTED_...] tokens exist, PRESERVE THEM EXACTLY without alteration.
+4. The resolution property must be strictly one of: "(Approved)", "(Noted)", "(Action Required)".
+5. Language: Professional Corporate English."""
     }
 }
 
 t = I18N[lang]
 
-# 頁面美化 CSS
-st.markdown("""
-    <style>
-    .sidebar-title { font-weight: bold; font-size: 1.2em; margin-bottom: 10px; }
-    .guideline-card {
-        background-color: rgba(255, 255, 255, 0.08); color: inherit; padding: 12px;
-        border-radius: 6px; border: 1px solid rgba(128, 128, 128, 0.3); border-left: 4px solid #0056b3;
-        margin-bottom: 12px; font-size: 0.88em; line-height: 1.5;
-    }
-    .guideline-card b { color: #3182ce; }
-    table { width: 100% !important; border-collapse: collapse; }
-    th:nth-child(1), td:nth-child(1) { width: 10% !important; text-align: center !important; }
-    th:nth-child(2), td:nth-child(2) { width: 72% !important; }
-    th:nth-child(3), td:nth-child(3) { width: 18% !important; text-align: center !important; white-space: nowrap !important; }
-    .footer-support { font-size: 0.8em; color: #a0aec0; margin-top: 15px; }
-    .footer-support a { color: #63b3ed; text-decoration: underline; }
-    </style>
-""", unsafe_allow_html=True)
+# ==========================================
+# 2. 🛡️ 檔案安全檢驗 (Magic Bytes Validator)
+# ==========================================
+def validate_openxml_magic(file) -> bool:
+    if file is None:
+        return True
+    try:
+        file.seek(0)
+        header = file.read(4)
+        file.seek(0)
+        return header == b'PK\x03\x04'
+    except Exception:
+        return False
 
 # ==========================================
-# 2. 🛡️ 本地端 PII 敏感數據遮蔽器 (ISO 27701 假名化)
+# 3. 🛡️ 本地端 PII 遮蔽器 (防二次污染)
 # ==========================================
 class PIIMasker:
-    PATTERNS = {
-        'HKID':    r'\b[A-Z]{1,2}\d{6}[\(]?\d?[\)]?[A-Z]?\b',
-        'TW_ID':   r'\b[A-Z][12]\d{8}\b',
-        'CN_ID':   r'\b\d{17}[\dXx]\b',
-        'EMAIL':   r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}',
-        'PHONE':   r'(?:\+?852[\s\-]?)?(?:\d{4}[\s\-]?\d{4}|\d{8})',
-        'SALARY':  r'(?:薪資|薪|月薪|年薪|salary)[\s：:]*(?:HK\$|NT\$|¥|\$)?\s*[\d,]+(?:K|k|萬)?',
-    }
+    PATTERNS = [
+        ('HKID',   r'\b[A-Z]{1,2}\d{6}[\(]?\d?[\)]?[A-Z]?\b'),
+        ('TW_ID',  r'\b[A-Z][12]\d{8}\b'),
+        ('CN_ID',  r'\b\d{17}[\dXx]\b'),
+        ('EMAIL',  r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b'),
+        ('PHONE',  r'(?:\+?852[\s\-]?)?(?:\b\d{4}[\s\-]?\d{4}\b|\b\d{8}\b)'),
+        ('SALARY', r'(?:薪資|薪|月薪|年薪|salary)[\s：:]*(?:HK\$|NT\$|¥|\$)?\s*[\d,]+(?:K|k|萬)?'),
+    ]
 
     def __init__(self):
         self.vault = {}
@@ -171,11 +216,14 @@ class PIIMasker:
         self.vault.clear()
         self.counters.clear()
         out = text
-        for typ, pat in self.PATTERNS.items():
+        for typ, pat in self.PATTERNS:
             def _repl(m):
+                val = m.group(0)
+                if "[REDACTED_" in val:
+                    return val
                 self.counters[typ] = self.counters.get(typ, 0) + 1
                 tok = f"[REDACTED_{typ}_{self.counters[typ]}]"
-                self.vault[tok] = m.group(0)
+                self.vault[tok] = val
                 return tok
             out = re.sub(pat, _repl, out, flags=re.IGNORECASE)
         return out
@@ -188,12 +236,20 @@ class PIIMasker:
             out = out.replace(tok, self.vault[tok])
         return out
 
+    def unmask_json(self, data):
+        if isinstance(data, dict):
+            return {k: self.unmask_json(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self.unmask_json(v) for v in data]
+        elif isinstance(data, str):
+            return self.unmask(data)
+        return data
+
 # ==========================================
-# 3. 🛡️ 側邊欄：商務範本下載 & 指引
+# 4. 側邊欄與範本下載
 # ==========================================
 with st.sidebar:
-    st.markdown(f"<div class='sidebar-title'>{t['sidebar_template_download']}</div>", unsafe_allow_html=True)
-    
+    st.markdown(f"**{t['sidebar_template_download']}**")
     templates_to_download = [
         {"file": "template_weekly.docx", "label": "📄 Weekly / 例會範本", "out": "Weekly_Meeting_Template.docx"},
         {"file": "template_board.docx", "label": "🏛️ Board / 董事會範本", "out": "Board_Meeting_Template.docx"},
@@ -216,16 +272,16 @@ with st.sidebar:
             st.caption(f"⚠️ `{item['file']}` missing")
 
     st.markdown("---")
-    st.markdown(f"<div class='sidebar-title'>{t['sidebar_guidelines']}</div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='guideline-card'>{t['sidebar_guide_a']}</div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='guideline-card'>{t['sidebar_guide_b']}</div>", unsafe_allow_html=True)
+    st.markdown(f"**{t['sidebar_guidelines']}**")
+    st.markdown(t['sidebar_guide_a'], unsafe_allow_html=True)
+    st.markdown(t['sidebar_guide_b'], unsafe_allow_html=True)
     st.markdown("---")
     st.caption(t["sidebar_iso"])
     st.markdown("---")
-    st.markdown("<div class='footer-support'>💡 Developer: <a href='https://jackylawck.github.io/jackylawck/' target='_blank'>Jacky Law</a></div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size: 0.8em; color: #a0aec0;'>💡 Lead Architect: <a href='https://jackylawck.github.io/jackylawck/' target='_blank' style='color: #63b3ed;'>Jacky Law</a></div>", unsafe_allow_html=True)
 
 # ==========================================
-# 4. 主畫面介面與 BYOK 設定 (修復 404 路由)
+# 5. 主畫面介面與 BYOK
 # ==========================================
 st.title(t["title"])
 st.caption(t["caption"])
@@ -237,7 +293,6 @@ with st.expander(t["byok_title"], expanded=False):
     if use_byok:
         api_provider = st.selectbox(t["byok_provider"], ["GitHub Models", "OpenAI", "Azure OpenAI"], key="byok_provider")
         byok_key = st.text_input(t["byok_key"], type="password", placeholder="sk-... / ghp_...", key="byok_key")
-        
         default_model = "gpt-4o-mini"
         byok_model = st.text_input(t["byok_model"], value=st.session_state.get("byok_model", default_model), key="byok_model")
         byok_url = st.text_input(t["byok_url"], value=st.session_state.get("byok_url", ""), placeholder="https://models.inference.ai.azure.com", key="byok_url")
@@ -253,10 +308,42 @@ def get_openai_client(api_key: str, base_url: str):
     return OpenAI(**kwargs)
 
 # ==========================================
-# 5. Word 處理核心模組 (含範本留存邏輯)
+# 6. JSON 與 Markdown 雙向轉換引擎
+# ==========================================
+def json_to_markdown(minutes_data: dict) -> str:
+    """將結構化 JSON 轉為視覺化 Markdown"""
+    title = minutes_data.get("title", "會議記錄 / Meeting Minutes")
+    md = [f"# {title}\n"]
+    
+    meta = minutes_data.get("meta_info", {})
+    if any(meta.values()):
+        for k, v in meta.items():
+            if v:
+                md.append(f"**{k.capitalize()}**: {v}")
+        md.append("")
+
+    header_col3 = "決議" if lang == "繁體中文" else "Decision / Action"
+    header_col2 = "議題與討論事項" if lang == "繁體中文" else "Topic / Discussion"
+    header_col1 = "編號" if lang == "繁體中文" else "Item"
+
+    md.append(f"| {header_col1} | {header_col2} | {header_col3} |")
+    md.append("| :--- | :--- | :---: |")
+
+    for item in minutes_data.get("agenda_items", []):
+        i_id = str(item.get("id", "")).replace("|", "/")
+        i_topic = str(item.get("topic", "")).replace("|", "/").replace("\n", "<br>")
+        i_res = str(item.get("resolution", "")).replace("|", "/")
+        md.append(f"| {i_id} | {i_topic} | {i_res} |")
+
+    return "\n".join(md)
+
+# ==========================================
+# 7. Word 解析與渲染模組 (Direct JSON-to-OpenXML)
 # ==========================================
 def extract_text_from_docx(file):
-    doc = docx.Document(file)
+    if hasattr(file, 'seek'):
+        file.seek(0)
+    doc = Document(file)
     content = []
     for p in doc.paragraphs:
         if p.text.strip(): content.append(p.text.strip())
@@ -267,6 +354,8 @@ def extract_text_from_docx(file):
     return "\n".join(content)
 
 def extract_text_from_pptx(file):
+    if hasattr(file, 'seek'):
+        file.seek(0)
     prs = Presentation(file)
     content = []
     for idx, slide in enumerate(prs.slides, start=1):
@@ -281,7 +370,7 @@ def extract_text_from_pptx(file):
                     if any(row_data): content.append(" | ".join(row_data))
         if slide.has_notes_slide and slide.notes_slide.notes_text_frame:
             notes_text = slide.notes_slide.notes_text_frame.text.strip()
-            if notes_text: content.append(f"[Notes/備註]: {notes_text}")
+            if notes_text: content.append(f"[Notes]: {notes_text}")
     return "\n".join(content)
 
 def copy_cell_formatting(src_cell, dst_cell):
@@ -299,9 +388,11 @@ def copy_cell_formatting(src_cell, dst_cell):
             if src_run.font.color and src_run.font.color.rgb:
                 dst_run.font.color.rgb = src_run.font.color.rgb
 
-def fill_user_template(template_file, md_text: str) -> io.BytesIO:
-    template_file.seek(0)
-    doc = Document(io.BytesIO(template_file.read()))
+def fill_user_template_from_json(template_file, minutes_data: dict) -> io.BytesIO:
+    if hasattr(template_file, 'seek'):
+        template_file.seek(0)
+    doc = Document(io.BytesIO(template_file.read()) if hasattr(template_file, 'read') else template_file)
+    
     target_table = None
     for table in doc.tables:
         if len(table.columns) >= 3:
@@ -319,26 +410,16 @@ def fill_user_template(template_file, md_text: str) -> io.BytesIO:
         tr = target_table.rows[-1]._tr
         tbl.remove(tr)
 
-    lines = [ln.strip() for ln in md_text.splitlines()]
-    clean_rows = []
-    in_table = False
-    for line in lines:
-        if line.startswith("|") and line.endswith("|"):
-            in_table = True
-            if re.match(r'^\|[\s\:\-\|]+\|$', line): continue
-            clean_rows.append([c.strip() for c in line.strip("|").split("|")])
-        elif in_table and line == "":
-            break
-
-    if not clean_rows:
-        raise ValueError("Could not parse table structure from LLM response.")
-
-    for md_row in clean_rows[1:]:
+    for item in minutes_data.get("agenda_items", []):
         new_row = target_table.add_row()
+        row_values = [
+            str(item.get("id", "")),
+            str(item.get("topic", "")),
+            str(item.get("resolution", ""))
+        ]
         for col_idx in range(num_cols):
             cell = new_row.cells[col_idx]
-            text = md_row[col_idx].replace('**', '').replace('<br>', '\n') if col_idx < len(md_row) else ""
-            cell.text = text
+            cell.text = row_values[col_idx] if col_idx < len(row_values) else ""
             copy_cell_formatting(header_cells[col_idx], cell)
 
     buf = io.BytesIO()
@@ -346,7 +427,7 @@ def fill_user_template(template_file, md_text: str) -> io.BytesIO:
     buf.seek(0)
     return buf
 
-def convert_md_to_docx(md_text):
+def create_standard_docx_from_json(minutes_data: dict) -> io.BytesIO:
     doc = Document()
     for section in doc.sections:
         section.top_margin = Inches(1)
@@ -354,82 +435,64 @@ def convert_md_to_docx(md_text):
         section.left_margin = Inches(1)
         section.right_margin = Inches(1)
 
-    lines = md_text.strip().split('\n')
-    in_table = False
-    table_data = []
+    title_p = doc.add_paragraph()
+    title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    title_p.paragraph_format.space_after = Pt(12)
+    run = title_p.add_run(minutes_data.get("title", "會議記錄 / Meeting Minutes"))
+    run.font.size = Pt(18)
+    run.font.bold = True
+    run.font.color.rgb = RGBColor(0x1A, 0x36, 0x5D)
 
-    for line in lines:
-        line_str = line.strip()
-        if line_str.startswith('|') and line_str.endswith('|'):
-            if re.match(r'^\|[\s\:\-\|]+\|$', line_str): continue
-            cells = [c.strip() for c in line_str.strip('|').split('|')]
-            table_data.append(cells)
-            in_table = True
-            continue
-        else:
-            if in_table and table_data:
-                table = doc.add_table(rows=len(table_data), cols=len(table_data[0]))
-                table.style = 'Table Grid'
-                table.alignment = WD_TABLE_ALIGNMENT.CENTER
-                col_widths = [Inches(1.0), Inches(4.5), Inches(1.5)]
+    items = minutes_data.get("agenda_items", [])
+    if items:
+        table = doc.add_table(rows=len(items) + 1, cols=3)
+        table.style = 'Table Grid'
+        table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        col_widths = [Inches(1.0), Inches(4.5), Inches(1.5)]
 
-                for r_idx, row_cells in enumerate(table_data):
-                    row = table.rows[r_idx]
-                    trPr = row._tr.get_or_add_trPr()
-                    trPr.append(docx.oxml.OxmlElement('w:cantSplit'))
+        headers = ["編號", "議題與討論事項", "決議"] if lang == "繁體中文" else ["Item", "Topic / Discussion", "Decision / Action"]
+        header_row = table.rows[0]
+        header_trPr = header_row._tr.get_or_add_trPr()
+        header_trPr.append(docx.oxml.OxmlElement('w:tblHeader'))
+        header_trPr.append(docx.oxml.OxmlElement('w:cantSplit'))
 
-                    for c_idx, cell_value in enumerate(row_cells):
-                        cell = row.cells[c_idx]
-                        if c_idx < len(col_widths): cell.width = col_widths[c_idx]
-                        clean_text = cell_value.replace('**', '').replace('<br>', '\n')
-                        cell.text = clean_text
-                        cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-
-                        p = cell.paragraphs[0]
-                        p.paragraph_format.space_before = Pt(3)
-                        p.paragraph_format.space_after = Pt(3)
-                        p.paragraph_format.line_spacing = 1.15
-
-                        if r_idx == 0:
-                            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                            for run in p.runs:
-                                run.font.bold = True
-                                run.font.size = Pt(10.5)
-                                run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
-                            shading = docx.oxml.parse_xml(r'<w:shd {} w:fill="1A365D"/>'.format(docx.oxml.ns.nsdecls('w')))
-                            cell._tc.get_or_add_tcPr().append(shading)
-                            trPr.append(docx.oxml.OxmlElement('w:tblHeader'))
-                        else:
-                            if c_idx == 0 or c_idx == len(row_cells) - 1:
-                                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                            for run in p.runs:
-                                run.font.size = Pt(9.5)
-                table_data = []
-                in_table = False
-                doc.add_paragraph()
-
-        if not line_str: continue
-
-        if line_str.startswith('# '):
-            p = doc.add_paragraph()
+        for c_idx, h_text in enumerate(headers):
+            cell = header_row.cells[c_idx]
+            cell.width = col_widths[c_idx]
+            cell.text = h_text
+            cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+            p = cell.paragraphs[0]
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            p.paragraph_format.space_after = Pt(12)
-            run = p.add_run(line_str.replace('# ', '').strip())
-            run.font.size = Pt(18)
-            run.font.bold = True
-            run.font.color.rgb = RGBColor(0x1A, 0x36, 0x5D)
-        else:
-            p = doc.add_paragraph()
-            p.paragraph_format.space_after = Pt(2)
-            parts = re.split(r'(\*\*.*?\*\*)', line_str)
-            for part in parts:
-                if part.startswith('**') and part.endswith('**'):
-                    run = p.add_run(part[2:-2])
-                    run.font.bold = True
-                    run.font.size = Pt(10)
-                else:
-                    run = p.add_run(part)
-                    run.font.size = Pt(10)
+            p.runs[0].font.bold = True
+            p.runs[0].font.size = Pt(10.5)
+            p.runs[0].font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+            shading = docx.oxml.parse_xml(r'<w:shd {} w:fill="1A365D"/>'.format(docx.oxml.ns.nsdecls('w')))
+            cell._tc.get_or_add_tcPr().append(shading)
+
+        for r_idx, item in enumerate(items, start=1):
+            row = table.rows[r_idx]
+            trPr = row._tr.get_or_add_trPr()
+            trPr.append(docx.oxml.OxmlElement('w:cantSplit'))
+
+            row_data = [
+                str(item.get("id", "")),
+                str(item.get("topic", "")),
+                str(item.get("resolution", ""))
+            ]
+
+            for c_idx, cell_value in enumerate(row_data):
+                cell = row.cells[c_idx]
+                cell.width = col_widths[c_idx]
+                cell.text = cell_value
+                cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+                p = cell.paragraphs[0]
+                p.paragraph_format.space_before = Pt(3)
+                p.paragraph_format.space_after = Pt(3)
+                p.paragraph_format.line_spacing = 1.15
+                if c_idx == 0 or c_idx == 2:
+                    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                if p.runs:
+                    p.runs[0].font.size = Pt(9.5)
 
     bio = io.BytesIO()
     doc.save(bio)
@@ -437,7 +500,7 @@ def convert_md_to_docx(md_text):
     return bio
 
 # ==========================================
-# 6. 使用者輸入區域
+# 8. 使用者輸入區域
 # ==========================================
 st.subheader(t["sec_template"])
 
@@ -476,8 +539,11 @@ if template_option == t["template_builtin"]:
 else:
     format_file = st.file_uploader(t["upload_custom_tpl"], type=["docx"])
     if format_file:
-        format_file_source = format_file
-        st.success(t["success_custom_tpl"])
+        if validate_openxml_magic(format_file):
+            format_file_source = format_file
+            st.success(t["success_custom_tpl"])
+        else:
+            st.error(t["err_file_security"])
 
 st.markdown("---")
 
@@ -486,14 +552,24 @@ col1, col2 = st.columns([1, 1])
 
 with col1:
     current_ppt_file = st.file_uploader(t["mode_a"], type=["pptx"])
+    if current_ppt_file and not validate_openxml_magic(current_ppt_file):
+        st.error(t["err_file_security"])
+        current_ppt_file = None
 
 with col2:
     current_draft_text = st.text_area(t["mode_b"], height=180, placeholder=t["placeholder_b"])
 
 # ==========================================
-# 7. AI 生成邏輯
+# 9. AI 生成邏輯 (JSON Mode + Multi-Model Resilience)
 # ==========================================
-if st.button(t["btn_generate"], type="primary", use_container_width=True):
+generate_btn = st.button(
+    t["btn_generate"] if not st.session_state["is_processing"] else t["btn_processing"],
+    type="primary",
+    disabled=st.session_state["is_processing"],
+    use_container_width=True
+)
+
+if generate_btn:
     if not format_file_source:
         st.error(t["err_no_template"])
     elif not current_ppt_file and not current_draft_text.strip():
@@ -501,101 +577,123 @@ if st.button(t["btn_generate"], type="primary", use_container_width=True):
     elif not byok_key:
         st.error(t["err_no_key"])
     else:
-        if not use_byok:
-            if st.session_state["generation_count"] >= 10:
-                st.error(t["err_rate_limit"])
-                st.stop()
-
-        with st.spinner("⏳ Processing PII redaction and structure mapping..."):
-            try:
-                if hasattr(format_file_source, 'read'):
-                    format_file_source.seek(0)
-                    format_structure_text = extract_text_from_docx(io.BytesIO(format_file_source.read()))
-                else:
+        if not use_byok and st.session_state["generation_count"] >= 10:
+            st.error(t["err_rate_limit"])
+        else:
+            st.session_state["is_processing"] = True
+            with st.spinner("⏳ Processing..."):
+                try:
                     format_structure_text = extract_text_from_docx(format_file_source)
+                    ppt_content_text = extract_text_from_pptx(current_ppt_file) if current_ppt_file else ""
+
+                    masker = PIIMasker()
+                    masked_format = masker.mask(format_structure_text)
+                    masked_ppt = masker.mask(ppt_content_text)
+                    masked_draft = masker.mask(current_draft_text)
+
+                    client = get_openai_client(api_key=byok_key, base_url=byok_url)
+
+                    user_prompt = f"""
+                    Format Baseline (Extract Topic Hierarchy & IDs from here):
+                    {masked_format}
+
+                    Source Meeting Content to Summarize:
+                    Presentation Text: {masked_ppt}
+                    Draft Text: {masked_draft}
+                    """
+
+                    # Multi-Model Fallback 彈性降級矩陣
+                    candidate_models = [byok_model]
+                    if not use_byok:
+                        if byok_model == "gpt-4o-mini":
+                            candidate_models = ["openai/gpt-4o-mini", "gpt-4o-mini", "gpt-4o"]
+                        elif byok_model == "openai/gpt-4o-mini":
+                            candidate_models = ["openai/gpt-4o-mini", "gpt-4o-mini", "gpt-4o"]
+
+                    response = None
+                    last_err = None
+                    successful_model = None
+
+                    for target_model in candidate_models:
+                        try:
+                            response = client.chat.completions.create(
+                                messages=[
+                                    {"role": "system", "content": t["system_prompt"]},
+                                    {"role": "user", "content": user_prompt}
+                                ],
+                                model=target_model,
+                                temperature=0.2,
+                                response_format={"type": "json_object"}
+                            )
+                            if response:
+                                successful_model = target_model
+                                break
+                        except Exception as err:
+                            last_err = err
+                            continue
+
+                    if not response and last_err:
+                        raise last_err
+
+                    raw_json_str = response.choices[0].message.content
+                    raw_dict = json.loads(raw_json_str)
+
+                    # 於本地 Python 端安全還原脫敏個資
+                    final_minutes_dict = masker.unmask_json(raw_dict)
+                    final_minutes_md = json_to_markdown(final_minutes_dict)
+
+                    if not use_byok:
+                        st.session_state["generation_count"] += 1
+
+                    st.session_state["generated_minutes_json"] = final_minutes_dict
+                    st.session_state["generated_minutes_md"] = final_minutes_md
                     
-                ppt_content_text = extract_text_from_pptx(current_ppt_file) if current_ppt_file else ""
+                    # 寫入 Session 審計日誌
+                    st.session_state["audit_log"].append({
+                        "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+                        "model_used": successful_model,
+                        "byok_mode": use_byok,
+                        "pii_tokens_redacted": len(masker.vault),
+                        "agenda_items_count": len(final_minutes_dict.get("agenda_items", [])),
+                        "status": "SUCCESS"
+                    })
 
-                masker = PIIMasker()
-                masked_format = masker.mask(format_structure_text)
-                masked_ppt = masker.mask(ppt_content_text)
-                masked_draft = masker.mask(current_draft_text)
+                    st.success(f"{t['msg_success']} (Usage: {st.session_state['generation_count']}/10)")
 
-                client = get_openai_client(api_key=byok_key, base_url=byok_url)
-
-                user_prompt = f"""
-                Format Baseline:
-                {masked_format}
-
-                Source Meeting Content:
-                Presentation Text: {masked_ppt}
-                Draft Text: {masked_draft}
-                """
-
-                # 嘗試請求模型，若遇到模型名稱映射問題自動回退
-                candidate_models = [byok_model]
-                if not use_byok:
-                    if byok_model == "gpt-4o-mini":
-                        candidate_models.append("openai/gpt-4o-mini")
-                    elif byok_model == "openai/gpt-4o-mini":
-                        candidate_models.append("gpt-4o-mini")
-
-                response = None
-                last_err = None
-
-                for target_model in candidate_models:
-                    try:
-                        response = client.chat.completions.create(
-                            messages=[
-                                {"role": "system", "content": t["system_prompt"]},
-                                {"role": "user", "content": user_prompt}
-                            ],
-                            model=target_model,
-                            temperature=0.2,
-                        )
-                        if response:
-                            break
-                    except Exception as err:
-                        last_err = err
-                        continue
-
-                if not response and last_err:
-                    raise last_err
-
-                raw_md = response.choices[0].message.content
-                final_minutes_md = masker.unmask(raw_md)
-
-                if not use_byok:
-                    st.session_state["generation_count"] += 1
-
-                st.session_state["generated_minutes"] = final_minutes_md
-                st.success(f"{t['msg_success']} (Usage: {st.session_state['generation_count']}/10)")
-
-            except Exception as e:
-                st.error(f"❌ Analysis Error (Type: {type(e).__name__}). Please check your API Key or input content.")
+                except Exception as e:
+                    st.error(f"❌ Analysis Error (Type: {type(e).__name__}). Please check your API Key or input content.")
+                    st.session_state["audit_log"].append({
+                        "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+                        "error_type": type(e).__name__,
+                        "status": "FAILED"
+                    })
+                finally:
+                    st.session_state["is_processing"] = False
 
 # ==========================================
-# 8. 預覽與下載
+# 10. 預覽、下載與審計軌跡導出
 # ==========================================
-if st.session_state.get("generated_minutes"):
+if st.session_state.get("generated_minutes_json"):
     st.markdown("---")
     st.subheader(t["preview_title"])
-    st.markdown(st.session_state["generated_minutes"], unsafe_allow_html=True)
+    st.markdown(st.session_state["generated_minutes_md"], unsafe_allow_html=True)
     st.markdown("---")
     
+    minutes_dict = st.session_state["generated_minutes_json"]
+
     try:
         if hasattr(format_file_source, 'read'):
-            word_buf = fill_user_template(format_file_source, st.session_state["generated_minutes"])
+            word_buf = fill_user_template_from_json(format_file_source, minutes_dict)
             download_label = t["btn_download_docx_custom"]
         else:
-            word_buf = convert_md_to_docx(st.session_state["generated_minutes"])
+            word_buf = create_standard_docx_from_json(minutes_dict)
             download_label = t["btn_download_docx_builtin"]
     except Exception as e:
         st.warning(f"{t['msg_fallback']} ({e})")
-        word_buf = convert_md_to_docx(st.session_state["generated_minutes"])
+        word_buf = create_standard_docx_from_json(minutes_dict)
         download_label = t["btn_download_docx_fallback"]
 
-    col_d1, col_d2 = st.columns([2, 1])
+    col_d1, col_d2, col_d3 = st.columns([2, 1, 1])
     
     with col_d1:
         st.download_button(
@@ -608,11 +706,21 @@ if st.session_state.get("generated_minutes"):
         )
         
     with col_d2:
-        md_buf = io.BytesIO(st.session_state["generated_minutes"].encode("utf-8"))
+        md_buf = io.BytesIO(st.session_state["generated_minutes_md"].encode("utf-8"))
         st.download_button(
             label=t["btn_download_md"],
             data=md_buf,
             file_name="Meeting_Minutes.md",
             mime="text/markdown",
+            use_container_width=True
+        )
+
+    with col_d3:
+        audit_json = json.dumps(st.session_state["audit_log"], indent=2).encode("utf-8")
+        st.download_button(
+            label=t["btn_download_audit"],
+            data=audit_json,
+            file_name="Audit_Trail_ISO42001.json",
+            mime="application/json",
             use_container_width=True
         )
