@@ -271,7 +271,7 @@ with st.sidebar:
     st.markdown("<div style='font-size: 0.8em; color: #a0aec0;'>💡 Lead Architect: <a href='https://jackylawck.github.io/jackylawck/' target='_blank' style='color: #63b3ed;'>Jacky Law</a></div>", unsafe_allow_html=True)
 
 # ==========================================
-# 5. 主畫面介面與 BYOK
+# 5. 主畫面介面與 BYOK (標準化連線設定)
 # ==========================================
 st.title(t["title"])
 st.caption(t["caption"])
@@ -292,10 +292,11 @@ with st.expander(t["byok_title"], expanded=False):
         byok_url = "https://models.inference.ai.azure.com"
 
 def get_openai_client(api_key: str, base_url: str):
-    kwargs = {"api_key": api_key.strip()}
-    if base_url and base_url.strip():
-        kwargs["base_url"] = base_url.strip().rstrip("/")
-    return OpenAI(**kwargs)
+    key = api_key.strip()
+    url = base_url.strip().rstrip("/") if base_url else ""
+    if url:
+        return OpenAI(api_key=key, base_url=url)
+    return OpenAI(api_key=key)
 
 # ==========================================
 # 6. 強健解析引擎 (JSON + Markdown Dual Parser)
@@ -494,9 +495,10 @@ def create_standard_docx_from_json(minutes_data: dict) -> io.BytesIO:
             cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
             p = cell.paragraphs[0]
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            p.runs[0].font.bold = True
-            p.runs[0].font.size = Pt(10.5)
-            p.runs[0].font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+            if p.runs:
+                p.runs[0].font.bold = True
+                p.runs[0].font.size = Pt(10.5)
+                p.runs[0].font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
             shading = docx.oxml.parse_xml(r'<w:shd {} w:fill="1A365D"/>'.format(docx.oxml.ns.nsdecls('w')))
             cell._tc.get_or_add_tcPr().append(shading)
 
@@ -637,7 +639,7 @@ if generate_btn:
                             {"role": "system", "content": t["system_prompt"]},
                             {"role": "user", "content": user_prompt}
                         ],
-                        model=byok_model,
+                        model=byok_model.strip(),
                         temperature=0.2
                     )
 
