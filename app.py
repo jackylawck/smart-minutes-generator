@@ -271,7 +271,7 @@ with st.sidebar:
     st.markdown("<div style='font-size: 0.8em; color: #a0aec0;'>💡 Lead Architect: <a href='https://jackylawck.github.io/jackylawck/' target='_blank' style='color: #63b3ed;'>Jacky Law</a></div>", unsafe_allow_html=True)
 
 # ==========================================
-# 5. 主畫面介面與 BYOK
+# 5. 主畫面介面與 BYOK (修復連線端點)
 # ==========================================
 st.title(t["title"])
 st.caption(t["caption"])
@@ -285,11 +285,11 @@ with st.expander(t["byok_title"], expanded=False):
         byok_key = st.text_input(t["byok_key"], type="password", placeholder="sk-... / ghp_...", key="byok_key")
         default_model = "gpt-4o-mini"
         byok_model = st.text_input(t["byok_model"], value=st.session_state.get("byok_model", default_model), key="byok_model")
-        byok_url = st.text_input(t["byok_url"], value=st.session_state.get("byok_url", ""), placeholder="OpenAI 留空；GitHub 留空即可", key="byok_url")
+        byok_url = st.text_input(t["byok_url"], value=st.session_state.get("byok_url", "https://models.inference.ai.azure.com"), key="byok_url")
     else:
         byok_key = st.secrets.get("GITHUB_TOKEN", "")
         byok_model = "gpt-4o-mini"
-        byok_url = ""
+        byok_url = "https://models.inference.ai.azure.com"
 
 def get_openai_client(api_key: str, base_url: str):
     kwargs = {"api_key": api_key.strip()}
@@ -313,7 +313,7 @@ def parse_llm_output_to_data(raw_text: str):
     except Exception:
         pass
 
-    # 若非 JSON，以 Markdown 解析
+    # 若非標準 JSON，使用 Markdown 容錯解析
     lines = clean_text.splitlines()
     title = "會議記錄 / Meeting Minutes"
     agenda_items = []
@@ -329,7 +329,6 @@ def parse_llm_output_to_data(raw_text: str):
                 continue
             cells = [c.strip().replace(r'\|', '|') for c in re.split(r'(?<!\\)\|', l[1:-1])]
             if len(cells) >= 3:
-                # 排除標頭列
                 if cells[0] in ["編號", "Item", "Item No.", "序号"]:
                     continue
                 agenda_items.append({
@@ -493,267 +492,4 @@ def create_standard_docx_from_json(minutes_data: dict) -> io.BytesIO:
             cell = header_row.cells[c_idx]
             cell.width = col_widths[c_idx]
             cell.text = h_text
-            cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-            p = cell.paragraphs[0]
-            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            p.runs[0].font.bold = True
-            p.runs[0].font.size = Pt(10.5)
-            p.runs[0].font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
-            shading = docx.oxml.parse_xml(r'<w:shd {} w:fill="1A365D"/>'.format(docx.oxml.ns.nsdecls('w')))
-            cell._tc.get_or_add_tcPr().append(shading)
-
-        for r_idx, item in enumerate(items, start=1):
-            row = table.rows[r_idx]
-            trPr = row._tr.get_or_add_trPr()
-            trPr.append(docx.oxml.OxmlElement('w:cantSplit'))
-
-            row_data = [
-                str(item.get("id", "")),
-                str(item.get("topic", "")),
-                str(item.get("resolution", ""))
-            ]
-
-            for c_idx, cell_value in enumerate(row_data):
-                cell = row.cells[c_idx]
-                cell.width = col_widths[c_idx]
-                cell.text = cell_value
-                cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-                p = cell.paragraphs[0]
-                p.paragraph_format.space_before = Pt(3)
-                p.paragraph_format.space_after = Pt(3)
-                p.paragraph_format.line_spacing = 1.15
-                if c_idx == 0 or c_idx == 2:
-                    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                if p.runs:
-                    p.runs[0].font.size = Pt(9.5)
-
-    bio = io.BytesIO()
-    doc.save(bio)
-    bio.seek(0)
-    return bio
-
-# ==========================================
-# 8. 使用者輸入區域
-# ==========================================
-st.subheader(t["sec_template"])
-
-template_option = st.radio(
-    t["template_src"],
-    [t["template_builtin"], t["template_custom"]],
-    horizontal=True
-)
-
-format_file_source = None
-
-if template_option == t["template_builtin"]:
-    builtin_template = st.selectbox(
-        t["template_type"],
-        [
-            "通用團隊例會/週會範本 (Weekly / Team Meeting)",
-            "高層/董事會決議型範本 (Board / Governance)",
-            "專案跟進與檢討型範本 (Project / Deliverables)"
-        ]
-    )
-    template_map = {
-        "通用團隊例會/週會範本 (Weekly / Team Meeting)": ["template_weekly.docx", "templates/template_weekly.docx"],
-        "高層/董事會決議型範本 (Board / Governance)": ["template_board.docx", "templates/template_board.docx"],
-        "專案跟進與檢討型範本 (Project / Deliverables)": ["template_project.docx", "templates/template_project.docx"]
-    }
-    candidate_paths = template_map.get(builtin_template, [])
-    for path in candidate_paths:
-        if os.path.exists(path):
-            format_file_source = path
-            break
-            
-    if format_file_source:
-        st.success(f"Loaded: `{builtin_template}`")
-    else:
-        st.warning(f"⚠️ `{builtin_template}` .docx missing in repo.")
-else:
-    format_file = st.file_uploader(t["upload_custom_tpl"], type=["docx"])
-    if format_file:
-        if validate_openxml_magic(format_file):
-            format_file_source = format_file
-            st.success(t["success_custom_tpl"])
-        else:
-            st.error(t["err_file_security"])
-
-st.markdown("---")
-
-st.subheader(t["sec_content"])
-col1, col2 = st.columns([1, 1])
-
-with col1:
-    current_ppt_file = st.file_uploader(t["mode_a"], type=["pptx"])
-    if current_ppt_file and not validate_openxml_magic(current_ppt_file):
-        st.error(t["err_file_security"])
-        current_ppt_file = None
-
-with col2:
-    current_draft_text = st.text_area(t["mode_b"], height=180, placeholder=t["placeholder_b"])
-
-# ==========================================
-# 9. AI 生成邏輯 (雙端點自動降級容錯)
-# ==========================================
-generate_btn = st.button(
-    t["btn_generate"] if not st.session_state["is_processing"] else t["btn_processing"],
-    type="primary",
-    disabled=st.session_state["is_processing"],
-    use_container_width=True
-)
-
-if generate_btn:
-    if not format_file_source:
-        st.error(t["err_no_template"])
-    elif not current_ppt_file and not current_draft_text.strip():
-        st.error(t["err_no_content"])
-    elif not byok_key:
-        st.error(t["err_no_key"])
-    else:
-        if not use_byok and st.session_state["generation_count"] >= 10:
-            st.error(t["err_rate_limit"])
-        else:
-            st.session_state["is_processing"] = True
-            with st.spinner("⏳ Processing..."):
-                try:
-                    format_structure_text = extract_text_from_docx(format_file_source)
-                    ppt_content_text = extract_text_from_pptx(current_ppt_file) if current_ppt_file else ""
-
-                    masker = PIIMasker()
-                    masked_format = masker.mask(format_structure_text)
-                    masked_ppt = masker.mask(ppt_content_text)
-                    masked_draft = masker.mask(current_draft_text)
-
-                    user_prompt = f"""
-                    Format Baseline (Extract Topic Hierarchy & IDs from here):
-                    {masked_format}
-
-                    Source Meeting Content to Summarize:
-                    Presentation Text: {masked_ppt}
-                    Draft Text: {masked_draft}
-                    """
-
-                    # 端點與模型調度矩陣 (自動嘗試官方與 Azure 代理路徑)
-                    call_matrix = []
-                    if use_byok:
-                        call_matrix.append((byok_url, byok_model))
-                    else:
-                        call_matrix = [
-                            ("[https://models.inference.ai.azure.com](https://models.inference.ai.azure.com)", "gpt-4o-mini"),
-                            ("[https://models.inference.ai.azure.com](https://models.inference.ai.azure.com)", "openai/gpt-4o-mini"),
-                            ("[https://models.github.ai/inference](https://models.github.ai/inference)", "gpt-4o-mini"),
-                        ]
-
-                    response = None
-                    last_err = None
-                    successful_model = None
-
-                    for ep_url, ep_model in call_matrix:
-                        try:
-                            client = get_openai_client(api_key=byok_key, base_url=ep_url)
-                            response = client.chat.completions.create(
-                                messages=[
-                                    {"role": "system", "content": t["system_prompt"]},
-                                    {"role": "user", "content": user_prompt}
-                                ],
-                                model=ep_model,
-                                temperature=0.2
-                            )
-                            if response:
-                                successful_model = f"{ep_model} @ {ep_url}"
-                                break
-                        except Exception as err:
-                            last_err = err
-                            continue
-
-                    if not response and last_err:
-                        raise last_err
-
-                    raw_output = response.choices[0].message.content
-                    parsed_dict = parse_llm_output_to_data(raw_output)
-
-                    # 本地安全還原個資
-                    final_minutes_dict = masker.unmask_json(parsed_dict)
-                    final_minutes_md = json_to_markdown(final_minutes_dict)
-
-                    if not use_byok:
-                        st.session_state["generation_count"] += 1
-
-                    st.session_state["generated_minutes_json"] = final_minutes_dict
-                    st.session_state["generated_minutes_md"] = final_minutes_md
-                    
-                    st.session_state["audit_log"].append({
-                        "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
-                        "model_used": successful_model,
-                        "byok_mode": use_byok,
-                        "pii_tokens_redacted": len(masker.vault),
-                        "agenda_items_count": len(final_minutes_dict.get("agenda_items", [])),
-                        "status": "SUCCESS"
-                    })
-
-                    st.success(f"{t['msg_success']} (Usage: {st.session_state['generation_count']}/10)")
-
-                except Exception as e:
-                    st.error(f"❌ Analysis Error (Type: {type(e).__name__}). Please check your API Key or input content.")
-                    st.session_state["audit_log"].append({
-                        "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
-                        "error_type": type(e).__name__,
-                        "status": "FAILED"
-                    })
-                finally:
-                    st.session_state["is_processing"] = False
-
-# ==========================================
-# 10. 預覽、下載與審計軌跡導出
-# ==========================================
-if st.session_state.get("generated_minutes_json"):
-    st.markdown("---")
-    st.subheader(t["preview_title"])
-    st.markdown(st.session_state["generated_minutes_md"], unsafe_allow_html=True)
-    st.markdown("---")
-    
-    minutes_dict = st.session_state["generated_minutes_json"]
-
-    try:
-        if hasattr(format_file_source, 'read'):
-            word_buf = fill_user_template_from_json(format_file_source, minutes_dict)
-            download_label = t["btn_download_docx_custom"]
-        else:
-            word_buf = create_standard_docx_from_json(minutes_dict)
-            download_label = t["btn_download_docx_builtin"]
-    except Exception as e:
-        st.warning(f"{t['msg_fallback']} ({e})")
-        word_buf = create_standard_docx_from_json(minutes_dict)
-        download_label = t["btn_download_docx_fallback"]
-
-    col_d1, col_d2, col_d3 = st.columns([2, 1, 1])
-    
-    with col_d1:
-        st.download_button(
-            label=download_label,
-            data=word_buf,
-            file_name="Meeting_Minutes.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            type="primary",
-            use_container_width=True
-        )
-        
-    with col_d2:
-        md_buf = io.BytesIO(st.session_state["generated_minutes_md"].encode("utf-8"))
-        st.download_button(
-            label=t["btn_download_md"],
-            data=md_buf,
-            file_name="Meeting_Minutes.md",
-            mime="text/markdown",
-            use_container_width=True
-        )
-
-    with col_d3:
-        audit_json = json.dumps(st.session_state["audit_log"], indent=2).encode("utf-8")
-        st.download_button(
-            label=t["btn_download_audit"],
-            data=audit_json,
-            file_name="Audit_Trail_ISO42001.json",
-            mime="application/json",
-            use_container_width=True
-        )
+            cell.vertical_alignment = WD_ALIGN_VERTICAL.
