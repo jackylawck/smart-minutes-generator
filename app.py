@@ -57,7 +57,7 @@ I18N = {
         "byok_key": "輸入 API Key / Token",
         "byok_model": "模型名稱",
         "byok_url": "Base URL",
-        "byok_url_hint": "💡 GitHub Models 官方端點：`https://models.inference.ai.azure.com`（請勿填寫結尾的 `/chat/completions`）",
+        "byok_url_hint": "💡 GitHub Models 官方端點：`https://models.github.ai/inference`",
         "byok_model_hint": "💡 GitHub Models 請使用 `openai/gpt-4o-mini` 或 `openai/gpt-4o` 格式",
         "sec_template": "📁 1. 選擇或上傳會議記錄格式範本",
         "template_src": "請選擇會議記錄結構來源：",
@@ -121,7 +121,7 @@ I18N = {
         "byok_key": "Enter API Key / Token",
         "byok_model": "Model Name",
         "byok_url": "Base URL",
-        "byok_url_hint": "💡 GitHub Models standard endpoint: `https://models.inference.ai.azure.com` (do NOT append `/chat/completions`)",
+        "byok_url_hint": "💡 GitHub Models standard endpoint: `https://models.github.ai/inference`",
         "byok_model_hint": "💡 GitHub Models requires format like `openai/gpt-4o-mini` or `openai/gpt-4o`",
         "sec_template": "📁 1. Select or Upload Meeting Minutes Template",
         "template_src": "Select template source:",
@@ -168,7 +168,6 @@ Please respond with a valid JSON format:
     }
   ]
 }
-If unable to produce JSON, output a standard Markdown Table: `| Item No. | Topic / Discussion | Decision / Action |`.
 Preserve [REDACTED_...] tokens exactly. Language: Professional Corporate English."""
     }
 }
@@ -289,7 +288,7 @@ with st.sidebar:
     st.markdown("<div style='font-size: 0.8em; color: #a0aec0;'>💡 Lead Architect: <a href='https://jackylawck.github.io/jackylawck/' target='_blank' style='color: #63b3ed;'>Jacky Law</a></div>", unsafe_allow_html=True)
 
 # ==========================================
-# 5. 主畫面介面與 BYOK (含自動補丁防禦)
+# 5. 主畫面介面與 BYOK (GitHub 官方最新端點)
 # ==========================================
 st.title(t["title"])
 st.caption(t["caption"])
@@ -307,17 +306,16 @@ with st.expander(t["byok_title"], expanded=False):
         if api_provider == "GitHub Models":
             st.caption(t["byok_model_hint"])
 
-        default_url = "https://models.inference.ai.azure.com" if api_provider == "GitHub Models" else ""
+        default_url = "https://models.github.ai/inference" if api_provider == "GitHub Models" else ""
         byok_url = st.text_input(t["byok_url"], value=st.session_state.get("byok_url", default_url), key="byok_url")
         if api_provider == "GitHub Models":
             st.caption(t["byok_url_hint"])
     else:
         byok_key = st.secrets.get("GITHUB_TOKEN", "")
         byok_model = "openai/gpt-4o-mini"
-        byok_url = "https://models.inference.ai.azure.com"
+        byok_url = "https://models.github.ai/inference"
 
 def normalize_model_name(provider: str, model_name: str) -> str:
-    """自動修復模型名稱前綴，防止 GitHub Models 遺漏 publisher 報 404"""
     m = model_name.strip()
     if provider == "GitHub Models" or not provider:
         if m in ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo"]:
@@ -325,11 +323,9 @@ def normalize_model_name(provider: str, model_name: str) -> str:
     return m
 
 def get_openai_client(api_key: str, base_url: str):
-    """強健客戶端初始化：自動去除重複路徑與尾部斜線，設置超時"""
     key = api_key.strip()
     url = base_url.strip().rstrip("/") if base_url else ""
     
-    # 防禦性清理：防止使用者手動貼上 /chat/completions 或多餘端點
     if url:
         if url.endswith("/chat/completions"):
             url = url.replace("/chat/completions", "")
