@@ -45,7 +45,7 @@ with st.sidebar:
 I18N = {
     "繁體中文": {
         "title": "📝 智能會議記錄生成器 (Smart Minutes Generator)",
-        "caption": "金融防禦級架構：容錯 JSON/Markdown 解析、Magic Bytes 檔案校驗、PII 深度假名化與 ISO 42001 審計日誌",
+        "caption": "金融防禦級架構：自我修復解析、Magic Bytes 檔案校驗、PII 深度假名化與 ISO 42001 審計日誌",
         "sidebar_template_download": "📥 下載基準範本 (.docx)",
         "sidebar_guidelines": "📖 使用方式與格式指引",
         "sidebar_guide_a": "<b>📊 模式 A：上傳 PPT 簡報</b><br>• 排版建議：頁面頂部為大議題，中間為子題目。<br>• 顯示邏輯：自動填入範本結構。",
@@ -57,8 +57,8 @@ I18N = {
         "byok_key": "輸入 API Key / Token",
         "byok_model": "模型名稱",
         "byok_url": "Base URL",
-        "byok_url_hint": "💡 GitHub Models 官方端點：`https://models.github.ai/inference`",
-        "byok_model_hint": "💡 GitHub Models 請使用 `openai/gpt-4o-mini` 或 `openai/gpt-4o` 格式",
+        "byok_url_hint": "💡 GitHub Models 官方端點：`https://models.inference.ai.azure.com`",
+        "byok_model_hint": "💡 GitHub Models 請使用 `openai/gpt-4o-mini` 或 `gpt-4o-mini`",
         "sec_template": "📁 1. 選擇或上傳會議記錄格式範本",
         "template_src": "請選擇會議記錄結構來源：",
         "template_builtin": "內建標準範本 (免上傳)",
@@ -83,11 +83,14 @@ I18N = {
         "err_no_content": "🛑 請提供本次會議內容，上傳 PPT 簡報（選擇 A）或輸入會議草稿（選擇 B）。",
         "err_no_key": "🛑 未檢測到有效的 API Key。請確認 Secrets 已設定 GITHUB_TOKEN，或開啟 BYOK 輸入密鑰。",
         "err_rate_limit": "🛑 免費額度已達上限（每位訪客限 10 次）。請開啟上方 BYOK 輸入專屬 API Key。",
+        "err_429_ratelimit": "🛑 觸發 API 流量限制 (HTTP 429)。請稍候 30 秒後重試，或開啟上方 BYOK 切換至企業專屬通道。",
         "err_file_security": "🛑 檔案安全校驗失敗：檔案非合法 OpenXML 格式或已損毀。",
         "msg_success": "✨ 本次會議記錄已成功生成 (完成本地 PII 去識別化與結構化對齊)！",
         "msg_fallback": "⚠️ 自訂範本特殊格式套用失敗，已自動平滑回退至標準排版。",
+        "fallback_item_topic": "系統已完成會議內容比對，未檢測到與範本對應之明確議題，建議檢查範本結構或輸入草稿。",
+        "fallback_item_res": "（記錄）",
         "system_prompt": """你是一名精通企業行政與結構化合規管理的高級秘書。你的任務是進行「動態結構映射與內容提煉」。
-請優先輸出符合以下 JSON 格式的內容：
+請務必輸出嚴格合法的 JSON 物件格式：
 {
   "title": "會議記錄標題",
   "meta_info": {
@@ -104,12 +107,13 @@ I18N = {
     }
   ]
 }
-若無法輸出 JSON，請輸出標準 Markdown 表格：`| 編號 | 議題 | 決議 |`。
-文中包含的 [REDACTED_...] 標籤必須完全原樣留存。語言：繁體中文。"""
+注意：
+1. 嚴禁輸出多餘的 Markdown 贅字說明。
+2. 文中包含的 [REDACTED_...] 標籤必須完全原樣留存。語言：繁體中文。"""
     },
     "English": {
         "title": "📝 Smart Minutes Generator",
-        "caption": "Enterprise Defense Architecture: Enforced JSON Mode, Magic Bytes Validation, Deep PII Masking & ISO 42001 Audit Logging",
+        "caption": "Enterprise Defense Architecture: Self-Healing Parsing, Magic Bytes Validation, Deep PII Masking & ISO 42001 Audit Logging",
         "sidebar_template_download": "📥 Download Baseline Templates (.docx)",
         "sidebar_guidelines": "📖 User Guide & Format Rules",
         "sidebar_guide_a": "<b>📊 Mode A: Upload PPT Presentation</b><br>• Layout: Agenda topics at top, detailed bullet points below.<br>• Logic: Automatically maps content into template structure.",
@@ -121,8 +125,8 @@ I18N = {
         "byok_key": "Enter API Key / Token",
         "byok_model": "Model Name",
         "byok_url": "Base URL",
-        "byok_url_hint": "💡 GitHub Models standard endpoint: `https://models.github.ai/inference`",
-        "byok_model_hint": "💡 GitHub Models requires format like `openai/gpt-4o-mini` or `openai/gpt-4o`",
+        "byok_url_hint": "💡 GitHub Models standard endpoint: `https://models.inference.ai.azure.com`",
+        "byok_model_hint": "💡 GitHub Models requires `openai/gpt-4o-mini` or `gpt-4o-mini`",
         "sec_template": "📁 1. Select or Upload Meeting Minutes Template",
         "template_src": "Select template source:",
         "template_builtin": "Built-in Standard Template",
@@ -147,9 +151,12 @@ I18N = {
         "err_no_content": "🛑 Please provide meeting content via PPTX upload (Option A) or text draft (Option B).",
         "err_no_key": "🛑 No valid API Key detected. Please configure secrets or enable BYOK mode.",
         "err_rate_limit": "🛑 Free trial usage limit reached (10 generations per session). Please enable BYOK mode.",
+        "err_429_ratelimit": "🛑 Rate limit reached (HTTP 429). Please wait 30 seconds or enable BYOK to use a dedicated channel.",
         "err_file_security": "🛑 File validation failed: The uploaded file is not a valid OpenXML document.",
         "msg_success": "✨ Meeting minutes successfully generated (with local PII redaction and structure mapping)!",
         "msg_fallback": "⚠️ Custom template filling failed. Automatically falling back to standard format.",
+        "fallback_item_topic": "Meeting content summarized. No direct matching agenda topics detected. Please verify template hierarchy.",
+        "fallback_item_res": "(Noted)",
         "system_prompt": """You are an executive assistant specializing in corporate governance. Your task is "Dynamic Structure Mapping and Summarization".
 Please respond with a valid JSON format:
 {
@@ -288,7 +295,7 @@ with st.sidebar:
     st.markdown("<div style='font-size: 0.8em; color: #a0aec0;'>💡 Lead Architect: <a href='https://jackylawck.github.io/jackylawck/' target='_blank' style='color: #63b3ed;'>Jacky Law</a></div>", unsafe_allow_html=True)
 
 # ==========================================
-# 5. 主畫面介面與 BYOK (GitHub 官方最新端點)
+# 5. 主畫面介面與 BYOK
 # ==========================================
 st.title(t["title"])
 st.caption(t["caption"])
@@ -301,26 +308,19 @@ with st.expander(t["byok_title"], expanded=False):
         api_provider = st.selectbox(t["byok_provider"], ["GitHub Models", "OpenAI", "Azure OpenAI"], key="byok_provider")
         byok_key = st.text_input(t["byok_key"], type="password", placeholder="sk-... / ghp_... / github_pat_...", key="byok_key")
         
-        default_model = "openai/gpt-4o-mini" if api_provider == "GitHub Models" else "gpt-4o-mini"
+        default_model = "gpt-4o-mini"
         byok_model = st.text_input(t["byok_model"], value=st.session_state.get("byok_model", default_model), key="byok_model")
         if api_provider == "GitHub Models":
             st.caption(t["byok_model_hint"])
 
-        default_url = "https://models.github.ai/inference" if api_provider == "GitHub Models" else ""
+        default_url = "https://models.inference.ai.azure.com" if api_provider == "GitHub Models" else ""
         byok_url = st.text_input(t["byok_url"], value=st.session_state.get("byok_url", default_url), key="byok_url")
         if api_provider == "GitHub Models":
             st.caption(t["byok_url_hint"])
     else:
         byok_key = st.secrets.get("GITHUB_TOKEN", "")
-        byok_model = "openai/gpt-4o-mini"
-        byok_url = "https://models.github.ai/inference"
-
-def normalize_model_name(provider: str, model_name: str) -> str:
-    m = model_name.strip()
-    if provider == "GitHub Models" or not provider:
-        if m in ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo"]:
-            return f"openai/{m}"
-    return m
+        byok_model = "gpt-4o-mini"
+        byok_url = "https://models.inference.ai.azure.com"
 
 def get_openai_client(api_key: str, base_url: str):
     key = api_key.strip()
@@ -342,49 +342,61 @@ def get_openai_client(api_key: str, base_url: str):
     return OpenAI(**kwargs)
 
 # ==========================================
-# 6. 強健解析引擎 (JSON + Markdown Dual Parser)
+# 6. 強健自癒解析引擎 (JSON + Markdown + Empty Fallback)
 # ==========================================
 def parse_llm_output_to_data(raw_text: str):
     clean_text = raw_text.strip()
-    if clean_text.startswith("```"):
-        clean_text = re.sub(r"^```(?:json|markdown)?\n?", "", clean_text)
-        clean_text = re.sub(r"\n?```$", "", clean_text).strip()
+    
+    match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', clean_text)
+    if match:
+        clean_text = match.group(1).strip()
 
+    data = None
     try:
-        data = json.loads(clean_text)
-        if isinstance(data, dict) and "agenda_items" in data:
-            return data
+        parsed_json = json.loads(clean_text)
+        if isinstance(parsed_json, dict) and "agenda_items" in parsed_json:
+            data = parsed_json
     except Exception:
         pass
 
-    lines = clean_text.splitlines()
-    title = "會議記錄 / Meeting Minutes"
-    agenda_items = []
-    in_table = False
+    if not data:
+        lines = clean_text.splitlines()
+        title = "會議記錄 / Meeting Minutes"
+        agenda_items = []
 
-    for line in lines:
-        l = line.strip()
-        if l.startswith("# "):
-            title = l.replace("# ", "").strip()
-        elif l.startswith("|") and l.endswith("|"):
-            in_table = True
-            if re.match(r'^\|[\s\:\-\|]+\|$', l):
-                continue
-            cells = [c.strip().replace(r'\|', '|') for c in re.split(r'(?<!\\)\|', l[1:-1])]
-            if len(cells) >= 3:
-                if cells[0] in ["編號", "Item", "Item No.", "序号"]:
+        for line in lines:
+            l = line.strip()
+            if l.startswith("# "):
+                title = l.replace("# ", "").strip()
+            elif l.startswith("|") and l.endswith("|"):
+                if re.match(r'^\|[\s\:\-\|]+\|$', l):
                     continue
-                agenda_items.append({
-                    "id": cells[0],
-                    "topic": " - ".join(cells[1:-1]) if len(cells) > 3 else cells[1],
-                    "resolution": cells[-1]
-                })
+                cells = [c.strip().replace(r'\|', '|') for c in re.split(r'(?<!\\)\|', l[1:-1])]
+                if len(cells) >= 3:
+                    if cells[0] in ["編號", "Item", "Item No.", "序号"]:
+                        continue
+                    item_id = cells[0] if cells[0] else "1.1"
+                    agenda_items.append({
+                        "id": item_id,
+                        "topic": " - ".join(cells[1:-1]) if len(cells) > 3 else cells[1],
+                        "resolution": cells[-1] if cells[-1] else t["fallback_item_res"]
+                    })
 
-    return {
-        "title": title,
-        "meta_info": {},
-        "agenda_items": agenda_items
-    }
+        data = {
+            "title": title,
+            "meta_info": {},
+            "agenda_items": agenda_items
+        }
+
+    # 🚀 自癒防禦：若 agenda_items 為空，自動補齊預設條目，防止 Word 破版
+    if not data.get("agenda_items") or len(data["agenda_items"]) == 0:
+        data["agenda_items"] = [{
+            "id": "1.1",
+            "topic": t["fallback_item_topic"],
+            "resolution": t["fallback_item_res"]
+        }]
+
+    return data
 
 def json_to_markdown(minutes_data: dict) -> str:
     title = minutes_data.get("title", "會議記錄 / Meeting Minutes")
@@ -639,7 +651,7 @@ with col2:
     current_draft_text = st.text_area(t["mode_b"], height=180, placeholder=t["placeholder_b"])
 
 # ==========================================
-# 9. AI 生成邏輯
+# 9. AI 生成邏輯 (含 429 智能捕捉與雙模自癒)
 # ==========================================
 generate_btn = st.button(
     t["btn_generate"] if not st.session_state["is_processing"] else t["btn_processing"],
@@ -665,6 +677,9 @@ if generate_btn:
                     format_structure_text = extract_text_from_docx(format_file_source)
                     ppt_content_text = extract_text_from_pptx(current_ppt_file) if current_ppt_file else ""
 
+                    if len(ppt_content_text) > 50000:
+                        ppt_content_text = ppt_content_text[:50000] + "\n...(Content truncated for safety)"
+
                     masker = PIIMasker()
                     masked_format = masker.mask(format_structure_text)
                     masked_ppt = masker.mask(ppt_content_text)
@@ -679,18 +694,41 @@ if generate_btn:
                     Draft Text: {masked_draft}
                     """
 
-                    provider_name = st.session_state.get("byok_provider", "GitHub Models") if use_byok else "GitHub Models"
-                    target_model = normalize_model_name(provider_name, byok_model)
-                    
                     client = get_openai_client(api_key=byok_key, base_url=byok_url)
-                    response = client.chat.completions.create(
-                        messages=[
-                            {"role": "system", "content": t["system_prompt"]},
-                            {"role": "user", "content": user_prompt}
-                        ],
-                        model=target_model,
-                        temperature=0.2
-                    )
+                    
+                    candidate_models = [byok_model.strip()]
+                    if byok_model.strip() == "gpt-4o-mini":
+                        candidate_models.append("openai/gpt-4o-mini")
+                    elif byok_model.strip() == "openai/gpt-4o-mini":
+                        candidate_models.append("gpt-4o-mini")
+
+                    response = None
+                    last_api_err = None
+                    used_model = None
+
+                    for target_m in candidate_models:
+                        try:
+                            response = client.chat.completions.create(
+                                messages=[
+                                    {"role": "system", "content": t["system_prompt"]},
+                                    {"role": "user", "content": user_prompt}
+                                ],
+                                model=target_m,
+                                temperature=0.2
+                            )
+                            if response:
+                                used_model = target_m
+                                break
+                        except Exception as err:
+                            last_api_err = err
+                            # 🚀 若為 429 流量超限直接中斷輪詢，避免持續轟炸
+                            err_str = str(err).lower()
+                            if "429" in err_str or "rate limit" in err_str:
+                                break
+                            continue
+
+                    if not response and last_api_err:
+                        raise last_api_err
 
                     raw_output = response.choices[0].message.content
                     parsed_dict = parse_llm_output_to_data(raw_output)
@@ -707,7 +745,7 @@ if generate_btn:
                     
                     st.session_state["audit_log"].append({
                         "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
-                        "model_used": target_model,
+                        "model_used": used_model,
                         "byok_mode": use_byok,
                         "pii_tokens_redacted": len(masker.vault),
                         "agenda_items_count": len(final_minutes_dict.get("agenda_items", [])),
@@ -717,10 +755,16 @@ if generate_btn:
                     st.success(f"{t['msg_success']} (Usage: {st.session_state['generation_count']}/10)")
 
                 except Exception as e:
-                    st.error(f"❌ Analysis Error (Type: {type(e).__name__}). Please check your API Key or input content.")
+                    err_msg = str(e)
+                    # 🚀 智能攔截 HTTP 429 Rate Limit
+                    if "429" in err_msg.lower() or "rate limit" in err_msg.lower():
+                        st.error(t["err_429_ratelimit"])
+                    else:
+                        st.error(f"❌ Analysis Error: {err_msg}")
+                        
                     st.session_state["audit_log"].append({
                         "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
-                        "error_type": type(e).__name__,
+                        "error_details": err_msg,
                         "status": "FAILED"
                     })
                 finally:
