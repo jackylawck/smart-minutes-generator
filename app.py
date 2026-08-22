@@ -56,7 +56,7 @@ I18N = {
         "byok_provider": "API 供應商類型",
         "byok_key": "輸入 API Key / Token",
         "byok_model": "模型名稱",
-        "byok_url": "Base URL (OpenAI 留空；GitHub 留空即可走預設)",
+        "byok_url": "Base URL (OpenAI 留空；GitHub 預設為 https://models.inference.ai.azure.com)",
         "sec_template": "📁 1. 選擇或上傳會議記錄格式範本",
         "template_src": "請選擇會議記錄結構來源：",
         "template_builtin": "內建標準範本 (免上傳)",
@@ -117,7 +117,7 @@ I18N = {
         "byok_provider": "API Provider Type",
         "byok_key": "Enter API Key / Token",
         "byok_model": "Model Name",
-        "byok_url": "Base URL (Leave blank for OpenAI/GitHub default)",
+        "byok_url": "Base URL (Leave blank for OpenAI; GitHub default is https://models.inference.ai.azure.com)",
         "sec_template": "📁 1. Select or Upload Meeting Minutes Template",
         "template_src": "Select template source:",
         "template_builtin": "Built-in Standard Template",
@@ -184,7 +184,6 @@ def validate_openxml_magic(file) -> bool:
         return False
 
 def has_valid_table(file) -> bool:
-    """檢查自訂範本是否具備至少 3 欄的表格"""
     try:
         file.seek(0)
         doc = Document(io.BytesIO(file.read()))
@@ -284,7 +283,7 @@ with st.sidebar:
     st.markdown("<div style='font-size: 0.8em; color: #a0aec0;'>💡 Lead Architect: <a href='https://jackylawck.github.io/jackylawck/' target='_blank' style='color: #63b3ed;'>Jacky Law</a></div>", unsafe_allow_html=True)
 
 # ==========================================
-# 5. 主畫面介面與 BYOK
+# 5. 主畫面介面與 BYOK (嚴格對齊 GitHub Models)
 # ==========================================
 st.title(t["title"])
 st.caption(t["caption"])
@@ -296,12 +295,16 @@ with st.expander(t["byok_title"], expanded=False):
     if use_byok:
         api_provider = st.selectbox(t["byok_provider"], ["GitHub Models", "OpenAI", "Azure OpenAI"], key="byok_provider")
         byok_key = st.text_input(t["byok_key"], type="password", placeholder="sk-... / github_pat_...", key="byok_key")
-        default_model = "gpt-4o-mini"
+        
+        default_model = "openai/gpt-4o-mini" if api_provider == "GitHub Models" else "gpt-4o-mini"
         byok_model = st.text_input(t["byok_model"], value=st.session_state.get("byok_model", default_model), key="byok_model")
-        byok_url = st.text_input(t["byok_url"], value=st.session_state.get("byok_url", "https://models.inference.ai.azure.com"), key="byok_url")
+        
+        default_url = "https://models.inference.ai.azure.com" if api_provider == "GitHub Models" else ""
+        byok_url = st.text_input(t["byok_url"], value=st.session_state.get("byok_url", default_url), key="byok_url")
     else:
         byok_key = st.secrets.get("GITHUB_TOKEN", "")
-        byok_model = "gpt-4o-mini"
+        # GitHub Models 完整標準識別名稱
+        byok_model = "openai/gpt-4o-mini"
         byok_url = "https://models.inference.ai.azure.com"
 
 def get_openai_client(api_key: str, base_url: str):
@@ -609,7 +612,7 @@ with col2:
     current_draft_text = st.text_area(t["mode_b"], height=180, placeholder=t["placeholder_b"])
 
 # ==========================================
-# 9. AI 生成邏輯 (強制 JSON Mode 輸出)
+# 9. AI 生成邏輯 (嚴格對齊 GitHub Models)
 # ==========================================
 generate_btn = st.button(
     t["btn_generate"] if not st.session_state["is_processing"] else t["btn_processing"],
@@ -656,8 +659,7 @@ if generate_btn:
                             {"role": "user", "content": user_prompt}
                         ],
                         model=byok_model.strip(),
-                        temperature=0.2,
-                        response_format={"type": "json_object"}
+                        temperature=0.2
                     )
 
                     raw_output = response.choices[0].message.content
