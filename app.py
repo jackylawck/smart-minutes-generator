@@ -59,7 +59,7 @@ I18N = {
         "byok_model": "模型名稱",
         "byok_url": "Base URL",
         "byok_url_hint": "💡 GitHub Models 新版官方端點：`https://models.github.ai/inference`",
-        "byok_model_hint": "💡 GitHub Models 請使用 `openai/gpt-4o-mini` 或 `gpt-4o-mini`",
+        "byok_model_hint": "💡 GitHub Models 請使用 `openai/gpt-4o-mini`",
         "sec_template": "📁 1. 選擇或上傳會議記錄格式範本",
         "template_src": "請選擇會議記錄結構來源：",
         "template_builtin": "內建標準範本 (免上傳)",
@@ -128,7 +128,7 @@ I18N = {
         "byok_model": "Model Name",
         "byok_url": "Base URL",
         "byok_url_hint": "💡 GitHub Models new endpoint: `https://models.github.ai/inference`",
-        "byok_model_hint": "💡 GitHub Models requires `openai/gpt-4o-mini` or `gpt-4o-mini`",
+        "byok_model_hint": "💡 GitHub Models requires `openai/gpt-4o-mini`",
         "sec_template": "📁 1. Select or Upload Meeting Minutes Template",
         "template_src": "Select template source:",
         "template_builtin": "Built-in Standard Template",
@@ -298,7 +298,7 @@ with st.sidebar:
     st.markdown("<div style='font-size: 0.8em; color: #a0aec0;'>💡 Lead Architect: <a href='https://jackylawck.github.io/jackylawck/' target='_blank' style='color: #63b3ed;'>Jacky Law</a></div>", unsafe_allow_html=True)
 
 # ==========================================
-# 5. 主畫面與 BYOK (全面遷移至 models.github.ai)
+# 5. 主畫面與 BYOK
 # ==========================================
 st.title(t["title"])
 st.caption(t["caption"])
@@ -321,12 +321,13 @@ with st.expander(t["byok_title"], expanded=False):
         if api_provider == "GitHub Models":
             st.caption(t["byok_url_hint"])
     else:
-        byok_key = st.secrets.get("GITHUB_TOKEN", "")
+        raw_secret = st.secrets.get("GITHUB_TOKEN", "")
+        byok_key = str(raw_secret).strip().replace("\n", "").replace("\r", "").strip("\"'")
         byok_model = "openai/gpt-4o-mini"
         byok_url = "https://models.github.ai/inference"
 
 # ==========================================
-# 6. 連線初始化 (相容新端點)
+# 6. 連線初始化
 # ==========================================
 def get_openai_client(api_key: str, base_url: str):
     key = api_key.strip()
@@ -670,7 +671,7 @@ with col2:
     current_draft_text = st.text_area(t["mode_b"], height=180, placeholder=t["placeholder_b"])
 
 # ==========================================
-# 10. AI 生成邏輯
+# 10. AI 生成邏輯 (純淨官方端點，徹底告別 410)
 # ==========================================
 generate_btn = st.button(
     t["btn_generate"] if not st.session_state["is_processing"] else t["btn_processing"],
@@ -713,42 +714,15 @@ if generate_btn:
                     Draft Text: {masked_draft}
                     """
 
-                    endpoints = [
-                        {"url": byok_url, "model": byok_model.strip()},
-                        {"url": "https://models.github.ai/inference", "model": "openai/gpt-4o-mini"},
-                        {"url": "https://models.github.ai/inference", "model": "gpt-4o-mini"}
-                    ]
-
-                    response = None
-                    last_err = None
-                    used_model = None
-
-                    for ep in endpoints:
-                        try:
-                            client = get_openai_client(api_key=byok_key, base_url=ep["url"])
-                            response = client.chat.completions.create(
-                                messages=[
-                                    {"role": "system", "content": t["system_prompt"]},
-                                    {"role": "user", "content": user_prompt}
-                                ],
-                                model=ep["model"],
-                                temperature=0.2
-                            )
-                            if response:
-                                used_model = f"{ep['model']} @ {ep['url']}"
-                                break
-                        except httpx.ConnectError as ce:
-                            last_err = f"Connection Error: {ce}"
-                            continue
-                        except httpx.TimeoutException as te:
-                            last_err = f"Timeout: {te}"
-                            continue
-                        except Exception as e:
-                            last_err = e
-                            continue
-
-                    if not response and last_err:
-                        raise Exception(last_err)
+                    client = get_openai_client(api_key=byok_key, base_url=byok_url)
+                    response = client.chat.completions.create(
+                        messages=[
+                            {"role": "system", "content": t["system_prompt"]},
+                            {"role": "user", "content": user_prompt}
+                        ],
+                        model=byok_model.strip(),
+                        temperature=0.2
+                    )
 
                     raw_output = response.choices[0].message.content
                     parsed_dict = parse_llm_output_to_data(raw_output)
@@ -764,7 +738,7 @@ if generate_btn:
                     
                     st.session_state["audit_log"].append({
                         "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
-                        "model_used": used_model,
+                        "model_used": f"{byok_model} @ {byok_url}",
                         "byok_mode": use_byok,
                         "pii_tokens_redacted": len(masker.vault),
                         "agenda_items_count": len(final_minutes_dict.get("agenda_items", [])),
