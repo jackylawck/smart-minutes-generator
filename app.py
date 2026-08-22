@@ -58,7 +58,7 @@ I18N = {
         "byok_key": "輸入 API Key / Token",
         "byok_model": "模型名稱",
         "byok_url": "Base URL",
-        "byok_url_hint": "💡 GitHub Models 官方端點：`https://models.inference.ai.azure.com`",
+        "byok_url_hint": "💡 GitHub Models 新版官方端點：`https://models.github.ai/inference`",
         "byok_model_hint": "💡 GitHub Models 請使用 `openai/gpt-4o-mini` 或 `gpt-4o-mini`",
         "sec_template": "📁 1. 選擇或上傳會議記錄格式範本",
         "template_src": "請選擇會議記錄結構來源：",
@@ -85,7 +85,7 @@ I18N = {
         "err_no_key": "🛑 未檢測到有效的 API Key。請確認 Secrets 已設定 GITHUB_TOKEN，或開啟 BYOK 輸入密鑰。",
         "err_rate_limit": "🛑 免費額度已達上限（每位訪客限 10 次）。請開啟上方 BYOK 輸入專屬 API Key。",
         "err_429_ratelimit": "🛑 觸發 API 流量限制 (HTTP 429)。請稍候 30 秒後重試，或開啟上方 BYOK 切換至企業專屬通道。",
-        "err_connection": "🛑 無法連線至 API 端點。請檢查網路環境或 Base URL 設定。若使用 GitHub Models，請確保端點為 `https://models.inference.ai.azure.com`。",
+        "err_connection": "🛑 無法連線至 API 端點。請確認端點為 `https://models.github.ai/inference`。",
         "err_file_security": "🛑 檔案安全校驗失敗：檔案非合法 OpenXML 格式或已損毀。",
         "msg_success": "✨ 本次會議記錄已成功生成 (完成本地 PII 去識別化與結構化對齊)！",
         "msg_fallback": "⚠️ 自訂範本特殊格式套用失敗，已自動平滑回退至標準排版。",
@@ -127,7 +127,7 @@ I18N = {
         "byok_key": "Enter API Key / Token",
         "byok_model": "Model Name",
         "byok_url": "Base URL",
-        "byok_url_hint": "💡 GitHub Models standard endpoint: `https://models.inference.ai.azure.com`",
+        "byok_url_hint": "💡 GitHub Models new endpoint: `https://models.github.ai/inference`",
         "byok_model_hint": "💡 GitHub Models requires `openai/gpt-4o-mini` or `gpt-4o-mini`",
         "sec_template": "📁 1. Select or Upload Meeting Minutes Template",
         "template_src": "Select template source:",
@@ -154,7 +154,7 @@ I18N = {
         "err_no_key": "🛑 No valid API Key detected. Please configure secrets or enable BYOK mode.",
         "err_rate_limit": "🛑 Free trial usage limit reached (10 generations per session). Please enable BYOK mode.",
         "err_429_ratelimit": "🛑 Rate limit reached (HTTP 429). Please wait 30 seconds or enable BYOK.",
-        "err_connection": "🛑 Cannot connect to API endpoint. Please check Base URL or network settings. For GitHub Models, ensure `https://models.inference.ai.azure.com`.",
+        "err_connection": "🛑 Cannot connect to API endpoint. For GitHub Models, ensure `https://models.github.ai/inference`.",
         "err_file_security": "🛑 File validation failed: The uploaded file is not a valid OpenXML document.",
         "msg_success": "✨ Meeting minutes successfully generated (with local PII redaction and structure mapping)!",
         "msg_fallback": "⚠️ Custom template filling failed. Automatically falling back to standard format.",
@@ -298,7 +298,7 @@ with st.sidebar:
     st.markdown("<div style='font-size: 0.8em; color: #a0aec0;'>💡 Lead Architect: <a href='https://jackylawck.github.io/jackylawck/' target='_blank' style='color: #63b3ed;'>Jacky Law</a></div>", unsafe_allow_html=True)
 
 # ==========================================
-# 5. 主畫面與 BYOK
+# 5. 主畫面與 BYOK (全面遷移至 models.github.ai)
 # ==========================================
 st.title(t["title"])
 st.caption(t["caption"])
@@ -311,46 +311,38 @@ with st.expander(t["byok_title"], expanded=False):
         api_provider = st.selectbox(t["byok_provider"], ["GitHub Models", "OpenAI", "Azure OpenAI"], key="byok_provider")
         byok_key = st.text_input(t["byok_key"], type="password", placeholder="sk-... / ghp_... / github_pat_...", key="byok_key")
         
-        default_model = "gpt-4o-mini"
+        default_model = "openai/gpt-4o-mini" if api_provider == "GitHub Models" else "gpt-4o-mini"
         byok_model = st.text_input(t["byok_model"], value=st.session_state.get("byok_model", default_model), key="byok_model")
         if api_provider == "GitHub Models":
             st.caption(t["byok_model_hint"])
 
-        default_url = "https://models.inference.ai.azure.com" if api_provider == "GitHub Models" else ""
+        default_url = "https://models.github.ai/inference" if api_provider == "GitHub Models" else ""
         byok_url = st.text_input(t["byok_url"], value=st.session_state.get("byok_url", default_url), key="byok_url")
         if api_provider == "GitHub Models":
             st.caption(t["byok_url_hint"])
     else:
         byok_key = st.secrets.get("GITHUB_TOKEN", "")
-        byok_model = "gpt-4o-mini"
-        byok_url = "https://models.inference.ai.azure.com"
+        byok_model = "openai/gpt-4o-mini"
+        byok_url = "https://models.github.ai/inference"
 
 # ==========================================
-# 6. ⚡ 終極連線修復函數 (用最簡單嘅 httpx)
+# 6. 連線初始化 (相容新端點)
 # ==========================================
 def get_openai_client(api_key: str, base_url: str):
     key = api_key.strip()
     url = base_url.strip().rstrip("/") if base_url else ""
     
-    # 清理 URL 尾部多餘路徑
     if url:
         if url.endswith("/chat/completions"):
             url = url.replace("/chat/completions", "")
         if url.endswith("/v1"):
             url = url.replace("/v1", "")
 
-    # 🚀 使用最簡單的同步 HTTP Transport，並關閉所有不穩定選項
-    transport = httpx.HTTPTransport(
-        retries=3,                     # 自動重試 3 次
-        verify=True,                   # 啟用 SSL 驗證（但使用系統 CA）
-    )
-    
-    # 明確設定 headers 同 timeout
+    http_transport = httpx.HTTPTransport(retries=3, verify=True)
     http_client = httpx.Client(
-        transport=transport,
+        transport=http_transport,
         timeout=httpx.Timeout(90.0, connect=30.0, read=60.0, write=30.0),
         follow_redirects=True,
-        limits=httpx.Limits(max_keepalive_connections=1, max_connections=1),
         headers={
             "User-Agent": "SmartMinutesGenerator/1.0",
             "Accept": "application/json",
@@ -358,11 +350,10 @@ def get_openai_client(api_key: str, base_url: str):
         }
     )
 
-    # 建立 OpenAI Client，並強制使用 synchronous http_client
     kwargs = {
         "api_key": key,
         "http_client": http_client,
-        "max_retries": 0,   # 由 httpx 自己控制 retry
+        "max_retries": 0,
         "timeout": 90.0,
     }
     if url:
@@ -453,7 +444,7 @@ def json_to_markdown(minutes_data: dict) -> str:
     return "\n".join(md)
 
 # ==========================================
-# 8. Word 渲染模組 (同之前一樣)
+# 8. Word 渲染模組
 # ==========================================
 def extract_text_from_docx(file):
     if hasattr(file, 'seek'):
@@ -679,7 +670,7 @@ with col2:
     current_draft_text = st.text_area(t["mode_b"], height=180, placeholder=t["placeholder_b"])
 
 # ==========================================
-# 10. AI 生成邏輯 (雙端點 + 網絡診斷)
+# 10. AI 生成邏輯
 # ==========================================
 generate_btn = st.button(
     t["btn_generate"] if not st.session_state["is_processing"] else t["btn_processing"],
@@ -722,15 +713,11 @@ if generate_btn:
                     Draft Text: {masked_draft}
                     """
 
-                    # 🚀 雙端點輪詢 (GitHub Models + 備用端點)
                     endpoints = [
                         {"url": byok_url, "model": byok_model.strip()},
-                        {"url": byok_url, "model": "openai/gpt-4o-mini" if byok_model.strip() == "gpt-4o-mini" else "gpt-4o-mini"},
+                        {"url": "https://models.github.ai/inference", "model": "openai/gpt-4o-mini"},
+                        {"url": "https://models.github.ai/inference", "model": "gpt-4o-mini"}
                     ]
-                    
-                    # 如果預設 URL 是 Azure，加入官網備用
-                    if byok_url == "https://models.inference.ai.azure.com":
-                        endpoints.append({"url": "https://models.github.ai/inference", "model": "openai/gpt-4o-mini"})
 
                     response = None
                     last_err = None
