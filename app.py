@@ -45,7 +45,7 @@ with st.sidebar:
 I18N = {
     "繁體中文": {
         "title": "📝 智能會議記錄生成器 (Smart Minutes Generator)",
-        "caption": "金融防禦級架構：容錯 JSON/Markdown 解析、Magic Bytes 檔案校驗、PII 深度假名化與 ISO 42001 審計日誌",
+        "caption": "金融防禦級架構：API 強制 JSON 約束、Magic Bytes 檔案校驗、PII 深度假名化與 ISO 42001 審計日誌",
         "sidebar_template_download": "📥 下載基準範本 (.docx)",
         "sidebar_guidelines": "📖 使用方式與格式指引",
         "sidebar_guide_a": "<b>📊 模式 A：上傳 PPT 簡報</b><br>• 排版建議：頁面頂部為大議題，中間為子題目。<br>• 顯示邏輯：自動填入範本結構。",
@@ -64,6 +64,7 @@ I18N = {
         "template_type": "選擇內建商務範本類型：",
         "upload_custom_tpl": "請上傳作為結構基準的 Word 檔案 (.docx)",
         "success_custom_tpl": "成功載入並校驗自訂範本！匯出時將保留專屬 Logo 與排版。",
+        "warn_no_table": "⚠️ 偵測到自訂範本內未包含 3 欄式表格。匯出時系統將自動平滑切換至標準排版，保留完整內容。",
         "sec_content": "📊 2. 輸入本次會議內容來源 (選擇 A 或 選擇 B)",
         "mode_a": "選擇 A：上傳本次會議簡報 (.pptx)",
         "mode_b": "選擇 B：貼上會議草稿 (無 PPT 時使用)",
@@ -84,7 +85,7 @@ I18N = {
         "msg_success": "✨ 本次會議記錄已成功生成 (完成本地 PII 去識別化與結構化對齊)！",
         "msg_fallback": "⚠️ 自訂範本特殊格式套用失敗，已自動平滑回退至標準排版。",
         "system_prompt": """你是一名精通企業行政與結構化合規管理的高級秘書。你的任務是進行「動態結構映射與內容提煉」。
-請優先輸出符合以下 JSON 格式的內容：
+請務必輸出符合以下 JSON 格式的內容：
 {
   "title": "會議記錄標題",
   "meta_info": {
@@ -101,12 +102,11 @@ I18N = {
     }
   ]
 }
-若無法輸出 JSON，請輸出標準 Markdown 表格：`| 編號 | 議題 | 決議 |`。
 文中包含的 [REDACTED_...] 標籤必須完全原樣留存。語言：繁體中文。"""
     },
     "English": {
         "title": "📝 Smart Minutes Generator",
-        "caption": "Enterprise Defense Architecture: Resilient JSON/Markdown Parsing, Magic Bytes Validation, Deep PII Masking & ISO 42001 Audit Logging",
+        "caption": "Enterprise Defense Architecture: Enforced JSON Mode, Magic Bytes Validation, Deep PII Masking & ISO 42001 Audit Logging",
         "sidebar_template_download": "📥 Download Baseline Templates (.docx)",
         "sidebar_guidelines": "📖 User Guide & Format Rules",
         "sidebar_guide_a": "<b>📊 Mode A: Upload PPT Presentation</b><br>• Layout: Agenda topics at top, detailed bullet points below.<br>• Logic: Automatically maps content into template structure.",
@@ -125,6 +125,7 @@ I18N = {
         "template_type": "Select Built-in Template Style:",
         "upload_custom_tpl": "Upload a Word file (.docx) as structural baseline",
         "success_custom_tpl": "Custom template validated! Layout and logo will be preserved upon export.",
+        "warn_no_table": "⚠️ No 3-column table detected in custom template. System will fall back to standard layout on export.",
         "sec_content": "📊 2. Input Meeting Content (Option A or Option B)",
         "mode_a": "Option A: Upload Meeting Presentation (.pptx)",
         "mode_b": "Option B: Paste Meeting Draft Text",
@@ -145,7 +146,7 @@ I18N = {
         "msg_success": "✨ Meeting minutes successfully generated (with local PII redaction and structure mapping)!",
         "msg_fallback": "⚠️ Custom template filling failed. Automatically falling back to standard format.",
         "system_prompt": """You are an executive assistant specializing in corporate governance. Your task is "Dynamic Structure Mapping and Summarization".
-Please prioritize responding with a valid JSON format:
+Please respond with a valid JSON format:
 {
   "title": "Meeting Minutes Title",
   "meta_info": {
@@ -162,7 +163,6 @@ Please prioritize responding with a valid JSON format:
     }
   ]
 }
-If unable to produce JSON, output a standard Markdown Table: `| Item No. | Topic / Discussion | Decision / Action |`.
 Preserve [REDACTED_...] tokens exactly. Language: Professional Corporate English."""
     }
 }
@@ -170,7 +170,7 @@ Preserve [REDACTED_...] tokens exactly. Language: Professional Corporate English
 t = I18N[lang]
 
 # ==========================================
-# 2. 🛡️ 檔案安全檢驗 (Magic Bytes Validator)
+# 2. 🛡️ 檔案安全檢驗 (Magic Bytes & Table Pre-check)
 # ==========================================
 def validate_openxml_magic(file) -> bool:
     if file is None:
@@ -180,6 +180,19 @@ def validate_openxml_magic(file) -> bool:
         header = file.read(4)
         file.seek(0)
         return header == b'PK\x03\x04'
+    except Exception:
+        return False
+
+def has_valid_table(file) -> bool:
+    """檢查自訂範本是否具備至少 3 欄的表格"""
+    try:
+        file.seek(0)
+        doc = Document(io.BytesIO(file.read()))
+        file.seek(0)
+        for table in doc.tables:
+            if len(table.columns) >= 3:
+                return True
+        return False
     except Exception:
         return False
 
@@ -271,7 +284,7 @@ with st.sidebar:
     st.markdown("<div style='font-size: 0.8em; color: #a0aec0;'>💡 Lead Architect: <a href='https://jackylawck.github.io/jackylawck/' target='_blank' style='color: #63b3ed;'>Jacky Law</a></div>", unsafe_allow_html=True)
 
 # ==========================================
-# 5. 主畫面介面與 BYOK (標準化連線設定)
+# 5. 主畫面介面與 BYOK
 # ==========================================
 st.title(t["title"])
 st.caption(t["caption"])
@@ -574,7 +587,10 @@ else:
     if format_file:
         if validate_openxml_magic(format_file):
             format_file_source = format_file
-            st.success(t["success_custom_tpl"])
+            if has_valid_table(format_file):
+                st.success(t["success_custom_tpl"])
+            else:
+                st.warning(t["warn_no_table"])
         else:
             st.error(t["err_file_security"])
 
@@ -593,7 +609,7 @@ with col2:
     current_draft_text = st.text_area(t["mode_b"], height=180, placeholder=t["placeholder_b"])
 
 # ==========================================
-# 9. AI 生成邏輯
+# 9. AI 生成邏輯 (強制 JSON Mode 輸出)
 # ==========================================
 generate_btn = st.button(
     t["btn_generate"] if not st.session_state["is_processing"] else t["btn_processing"],
@@ -640,7 +656,8 @@ if generate_btn:
                             {"role": "user", "content": user_prompt}
                         ],
                         model=byok_model.strip(),
-                        temperature=0.2
+                        temperature=0.2,
+                        response_format={"type": "json_object"}
                     )
 
                     raw_output = response.choices[0].message.content
