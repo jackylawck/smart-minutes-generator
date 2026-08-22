@@ -326,20 +326,19 @@ with st.expander(t["byok_title"], expanded=False):
         byok_url = "https://models.github.ai/inference"
 
 # ==========================================
-# 6. 🚀 原生安全推論請求 (絕不走淘汰 Azure 轉址)
+# 6. 原生推論請求 (強制鎖定新版 GitHub Models 端點)
 # ==========================================
 def call_chat_completion(api_key: str, base_url: str, model_name: str, messages: list) -> str:
     key = api_key.strip()
-    url = base_url.strip().rstrip("/") if base_url else "https://models.github.ai/inference"
     
-    # 強制替換任何殘留的 Azure 域名
-    if "models.inference.ai.azure.com" in url:
-        url = "https://models.github.ai/inference"
+    # 徹底清除任何舊端點，無論 UI 傳入什麼，強制使用官方最新推論網關
+    url = "https://models.github.ai/inference"
+    full_endpoint = f"{url}/chat/completions"
 
-    if not url.endswith("/chat/completions"):
-        full_endpoint = f"{url}/chat/completions"
-    else:
-        full_endpoint = url
+    # 模型名稱正規化：確保包含 openai/ 前綴
+    model = model_name.strip()
+    if model in ["gpt-4o-mini", "gpt-4o"]:
+        model = f"openai/{model}"
 
     headers = {
         "Authorization": f"Bearer {key}",
@@ -349,12 +348,12 @@ def call_chat_completion(api_key: str, base_url: str, model_name: str, messages:
     }
 
     payload = {
-        "model": model_name.strip(),
+        "model": model,
         "messages": messages,
         "temperature": 0.2
     }
 
-    with httpx.Client(timeout=90.0, follow_redirects=False) as client:
+    with httpx.Client(timeout=90.0, follow_redirects=True) as client:
         response = client.post(full_endpoint, headers=headers, json=payload)
         
         if response.status_code != 200:
