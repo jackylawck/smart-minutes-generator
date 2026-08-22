@@ -58,7 +58,7 @@ I18N = {
         "byok_key": "輸入 API Key / Token",
         "byok_model": "模型名稱",
         "byok_url": "Base URL",
-        "byok_url_hint": "💡 GitHub Models 新版官方端點：`https://models.github.ai/inference`",
+        "byok_url_hint": "💡 GitHub Models 官方端點：`https://models.github.ai/inference`",
         "byok_model_hint": "💡 GitHub Models 請使用 `openai/gpt-4o-mini`",
         "sec_template": "📁 1. 選擇或上傳會議記錄格式範本",
         "template_src": "請選擇會議記錄結構來源：",
@@ -127,7 +127,7 @@ I18N = {
         "byok_key": "Enter API Key / Token",
         "byok_model": "Model Name",
         "byok_url": "Base URL",
-        "byok_url_hint": "💡 GitHub Models new endpoint: `https://models.github.ai/inference`",
+        "byok_url_hint": "💡 GitHub Models official endpoint: `https://models.github.ai/inference`",
         "byok_model_hint": "💡 GitHub Models requires `openai/gpt-4o-mini`",
         "sec_template": "📁 1. Select or Upload Meeting Minutes Template",
         "template_src": "Select template source:",
@@ -312,12 +312,12 @@ with st.expander(t["byok_title"], expanded=False):
         byok_key = st.text_input(t["byok_key"], type="password", placeholder="sk-... / ghp_... / github_pat_...", key="byok_key")
         
         default_model = "openai/gpt-4o-mini" if api_provider == "GitHub Models" else "gpt-4o-mini"
-        byok_model = st.text_input(t["byok_model"], value=st.session_state.get("byok_model", default_model), key="byok_model")
+        byok_model = st.text_input(t["byok_model"], value=default_model, key="byok_model")
         if api_provider == "GitHub Models":
             st.caption(t["byok_model_hint"])
 
         default_url = "https://models.github.ai/inference" if api_provider == "GitHub Models" else ""
-        byok_url = st.text_input(t["byok_url"], value=st.session_state.get("byok_url", default_url), key="byok_url")
+        byok_url = st.text_input(t["byok_url"], value=default_url, key="byok_url")
         if api_provider == "GitHub Models":
             st.caption(t["byok_url_hint"])
     else:
@@ -327,17 +327,20 @@ with st.expander(t["byok_title"], expanded=False):
         byok_url = "https://models.github.ai/inference"
 
 # ==========================================
-# 6. 連線初始化
+# 6. 連線初始化 (強制過濾淘汰的 Azure 端點)
 # ==========================================
 def get_openai_client(api_key: str, base_url: str):
     key = api_key.strip()
     url = base_url.strip().rstrip("/") if base_url else ""
     
-    if url:
-        if url.endswith("/chat/completions"):
-            url = url.replace("/chat/completions", "")
-        if url.endswith("/v1"):
-            url = url.replace("/v1", "")
+    # 🚀 強制攔截並修復任何遺留的舊 Azure 端點，防止 410 Brownout 報錯
+    if "models.inference.ai.azure.com" in url or not url:
+        url = "https://models.github.ai/inference"
+
+    if url.endswith("/chat/completions"):
+        url = url.replace("/chat/completions", "")
+    if url.endswith("/v1"):
+        url = url.replace("/v1", "")
 
     http_transport = httpx.HTTPTransport(retries=3, verify=True)
     http_client = httpx.Client(
@@ -356,9 +359,8 @@ def get_openai_client(api_key: str, base_url: str):
         "http_client": http_client,
         "max_retries": 0,
         "timeout": 90.0,
+        "base_url": url
     }
-    if url:
-        kwargs["base_url"] = url
     
     return OpenAI(**kwargs)
 
@@ -671,7 +673,7 @@ with col2:
     current_draft_text = st.text_area(t["mode_b"], height=180, placeholder=t["placeholder_b"])
 
 # ==========================================
-# 10. AI 生成邏輯 (純淨官方端點，徹底告別 410)
+# 10. AI 生成邏輯
 # ==========================================
 generate_btn = st.button(
     t["btn_generate"] if not st.session_state["is_processing"] else t["btn_processing"],
@@ -714,13 +716,16 @@ if generate_btn:
                     Draft Text: {masked_draft}
                     """
 
-                    client = get_openai_client(api_key=byok_key, base_url=byok_url)
+                    # 鎖定乾淨新端點
+                    clean_model = "openai/gpt-4o-mini"
+                    client = get_openai_client(api_key=byok_key, base_url="https://models.github.ai/inference")
+                    
                     response = client.chat.completions.create(
                         messages=[
                             {"role": "system", "content": t["system_prompt"]},
                             {"role": "user", "content": user_prompt}
                         ],
-                        model=byok_model.strip(),
+                        model=clean_model,
                         temperature=0.2
                     )
 
@@ -738,7 +743,7 @@ if generate_btn:
                     
                     st.session_state["audit_log"].append({
                         "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
-                        "model_used": f"{byok_model} @ {byok_url}",
+                        "model_used": "openai/gpt-4o-mini @ models.github.ai",
                         "byok_mode": use_byok,
                         "pii_tokens_redacted": len(masker.vault),
                         "agenda_items_count": len(final_minutes_dict.get("agenda_items", [])),
